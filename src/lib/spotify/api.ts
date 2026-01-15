@@ -421,4 +421,25 @@ export class SpotifyClient {
       tracks: trackUris.map((uri) => ({ uri })),
     });
   }
+
+  /**
+   * Gets track recommendations based on a seed track
+   * Uses the Spotify Recommendations API to find similar tracks
+   * @param seedTrackId - Spotify track ID to use as seed
+   * @param limit - Maximum number of recommendations to return (1-100, default 20)
+   * @returns Array of recommended SpotifyTrack objects
+   */
+  async getRecommendations(
+    seedTrackId: string,
+    limit: number = 20
+  ): Promise<SpotifyTrack[]> {
+    // Validate limit is within Spotify's allowed range
+    const clampedLimit = Math.min(Math.max(1, limit), 100);
+
+    const response = await this.get<{ tracks: SpotifyTrack[] }>(
+      `/recommendations?seed_tracks=${encodeURIComponent(seedTrackId)}&limit=${clampedLimit}`
+    );
+
+    return response.tracks || [];
+  }
 }

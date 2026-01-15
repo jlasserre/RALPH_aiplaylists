@@ -872,3 +872,255 @@ describe('SpotifyClient.searchTrack', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('SpotifyClient.getRecommendations', () => {
+  let client: SpotifyClient;
+
+  const mockRecommendedTracks = [
+    {
+      id: 'rec1',
+      uri: 'spotify:track:rec1',
+      name: 'Somebody to Love',
+      artists: [{ id: 'artist1', name: 'Queen' }],
+      album: {
+        id: 'album2',
+        name: 'A Day at the Races',
+        images: [{ url: 'https://example.com/cover2.jpg', width: 300, height: 300 }],
+      },
+      duration_ms: 295000,
+    },
+    {
+      id: 'rec2',
+      uri: 'spotify:track:rec2',
+      name: 'We Are the Champions',
+      artists: [{ id: 'artist1', name: 'Queen' }],
+      album: {
+        id: 'album3',
+        name: 'News of the World',
+        images: [{ url: 'https://example.com/cover3.jpg', width: 300, height: 300 }],
+      },
+      duration_ms: 179000,
+    },
+  ];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    client = new SpotifyClient('test-access-token');
+  });
+
+  it('should get recommendations for a seed track', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    const result = await client.getRecommendations('track123');
+
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe('Somebody to Love');
+    expect(result[1].name).toBe('We Are the Champions');
+  });
+
+  it('should call recommendations endpoint with correct URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/recommendations?seed_tracks=track123&limit=20',
+      expect.any(Object)
+    );
+  });
+
+  it('should use default limit of 20', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('limit=20'),
+      expect.any(Object)
+    );
+  });
+
+  it('should use custom limit when provided', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123', 10);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('limit=10'),
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to maximum of 100', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123', 150);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('limit=100'),
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to minimum of 1', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123', 0);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('limit=1'),
+      expect.any(Object)
+    );
+  });
+
+  it('should handle negative limit by clamping to 1', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track123', -5);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('limit=1'),
+      expect.any(Object)
+    );
+  });
+
+  it('should return empty array when no recommendations found', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: [],
+      }),
+    });
+
+    const result = await client.getRecommendations('track123');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array when tracks is null', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: null,
+      }),
+    });
+
+    const result = await client.getRecommendations('track123');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array when tracks is undefined', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    const result = await client.getRecommendations('track123');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should encode track ID in URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: mockRecommendedTracks,
+      }),
+    });
+
+    await client.getRecommendations('track with spaces');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('seed_tracks=track%20with%20spaces'),
+      expect.any(Object)
+    );
+  });
+
+  it('should propagate authentication errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Unauthorized' } }),
+    });
+
+    await expect(client.getRecommendations('track123')).rejects.toThrow(
+      SpotifyAuthError
+    );
+  });
+
+  it('should propagate rate limit errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({
+        'Retry-After': '30',
+      }),
+      json: async () => ({ error: { message: 'Rate limit exceeded' } }),
+    });
+
+    await expect(client.getRecommendations('track123')).rejects.toThrow(
+      SpotifyRateLimitError
+    );
+  });
+
+  it('should propagate API errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Invalid track ID' } }),
+    });
+
+    await expect(client.getRecommendations('invalid-track')).rejects.toThrow(
+      SpotifyAPIError
+    );
+  });
+});
