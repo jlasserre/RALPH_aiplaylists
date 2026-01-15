@@ -1,4 +1,4 @@
-import { ThreePanelLayout } from '@/components/layout';
+import { ThreePanelLayout, LeftPanel } from '@/components/layout';
 
 export default function Home() {
   return (
@@ -13,14 +13,7 @@ export default function Home() {
           </div>
         </div>
       }
-      leftPanel={
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800">Controls</h2>
-          <p className="text-sm text-gray-500">
-            Playlist controls will appear here.
-          </p>
-        </div>
-      }
+      leftPanel={<LeftPanel />}
       middlePanel={
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-800">Candidates</h2>
