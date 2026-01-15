@@ -381,3 +381,19 @@
   - clearPlaylist resets all state including isOwned back to true (for "New Playlist" flow)
   - markPendingAsSynced and removeMarkedSongs are helper methods for post-sync state updates
 ---
+
+## 2026-01-15 - US-027
+- What was implemented: Candidate Zustand store for managing current generation candidates
+- Files changed:
+  - src/store/candidateStore.ts - Zustand store with candidates array, isLoading state, and all actions/selectors
+  - src/store/candidateStore.test.ts - 35 tests covering all actions and selectors
+- **Learnings for future iterations:**
+  - CandidateSong type from @/types includes isMatched and isSelected for managing selection state
+  - generateCandidateId() follows same pattern as playlist: `candidate_${Date.now()}_${random}`
+  - setCandidates replaces all candidates and sets isLoading to false - call setLoading(true) before starting generation
+  - toggleSelection only works on matched songs - unmatched songs cannot be selected
+  - selectAll and deselectAll are convenience methods for bulk selection operations
+  - getSelectedCandidates selector filters for both isMatched AND isSelected
+  - getMatchRate selector returns { matched, total, percentage } for display in UI
+  - Use standalone selector functions (not store methods) for derived data: `getSelectedCandidates(useCandidateStore.getState())`
+---
