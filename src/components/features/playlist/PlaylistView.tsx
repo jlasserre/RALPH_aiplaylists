@@ -6,6 +6,9 @@ import { Button } from '@/components/ui';
 import { SongCard } from './SongCard';
 import { CANDIDATE_DRAG_TYPE } from './CandidateList';
 
+/** Data type identifier for playlist song reorder drag operations */
+export const PLAYLIST_SONG_DRAG_TYPE = 'application/x-playlist-song';
+
 interface PlaylistViewProps {
   /** List of songs in the playlist */
   songs: PlaylistSong[];
@@ -21,6 +24,8 @@ interface PlaylistViewProps {
   isReadOnly?: boolean;
   /** Callback when a candidate is dropped onto the playlist */
   onCandidateDrop?: (candidateId: string) => void;
+  /** Callback when songs are reordered via drag and drop */
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 /**
@@ -35,8 +40,11 @@ export function PlaylistView({
   isSaving = false,
   isReadOnly = false,
   onCandidateDrop,
+  onReorder,
 }: PlaylistViewProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
 
   const pendingCount = songs.filter((s) => s.state === 'pending').length;
   const markedForRemovalCount = songs.filter(
@@ -88,6 +96,50 @@ export function PlaylistView({
     if (candidateId && onCandidateDrop) {
       onCandidateDrop(candidateId);
     }
+  };
+
+  /**
+   * Handle drag start for reordering a song within the playlist
+   */
+  const handleSongDragStart = (e: DragEvent<HTMLDivElement>, index: number) => {
+    e.dataTransfer.setData(PLAYLIST_SONG_DRAG_TYPE, String(index));
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedIndex(index);
+  };
+
+  /**
+   * Handle drag end for reordering (cleanup)
+   */
+  const handleSongDragEnd = () => {
+    setDraggedIndex(null);
+    setDropTargetIndex(null);
+  };
+
+  /**
+   * Handle drag over a song (for reorder drop position indicator)
+   */
+  const handleSongDragOver = (e: DragEvent<HTMLDivElement>, index: number) => {
+    if (e.dataTransfer.types.includes(PLAYLIST_SONG_DRAG_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDropTargetIndex(index);
+    }
+  };
+
+  /**
+   * Handle drop on a song (for reordering)
+   */
+  const handleSongDrop = (e: DragEvent<HTMLDivElement>, targetIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sourceIndex = parseInt(e.dataTransfer.getData(PLAYLIST_SONG_DRAG_TYPE), 10);
+    if (!isNaN(sourceIndex) && onReorder && sourceIndex !== targetIndex) {
+      onReorder(sourceIndex, targetIndex);
+    }
+
+    setDraggedIndex(null);
+    setDropTargetIndex(null);
   };
 
   // Determine button label based on playlist state
@@ -230,15 +282,55 @@ export function PlaylistView({
 
       {/* Song list */}
       <div className="flex-1 overflow-y-auto space-y-2">
-        {songs.map((playlistSong) => (
-          <SongCard
+        {songs.map((playlistSong, index) => (
+          <div
             key={playlistSong.id}
-            song={playlistSong.song}
-            state={playlistSong.state}
-            showStateIcon
-            isClickable
-            onClick={() => onSongClick?.(playlistSong.id)}
-          />
+            draggable={!!onReorder}
+            onDragStart={(e) => handleSongDragStart(e, index)}
+            onDragEnd={handleSongDragEnd}
+            onDragOver={(e) => handleSongDragOver(e, index)}
+            onDrop={(e) => handleSongDrop(e, index)}
+            className={`relative ${
+              draggedIndex === index ? 'opacity-50' : ''
+            } ${onReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          >
+            {/* Drop position indicator - shows above this song */}
+            {dropTargetIndex === index && draggedIndex !== null && draggedIndex !== index && (
+              <div className="absolute -top-1 left-0 right-0 h-0.5 bg-blue-500 rounded-full z-10">
+                <div className="absolute -left-1 -top-1 w-2 h-2 bg-blue-500 rounded-full" />
+                <div className="absolute -right-1 -top-1 w-2 h-2 bg-blue-500 rounded-full" />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              {/* Drag handle */}
+              {onReorder && (
+                <div className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle cx="8" cy="6" r="1.5" />
+                    <circle cx="16" cy="6" r="1.5" />
+                    <circle cx="8" cy="12" r="1.5" />
+                    <circle cx="16" cy="12" r="1.5" />
+                    <circle cx="8" cy="18" r="1.5" />
+                    <circle cx="16" cy="18" r="1.5" />
+                  </svg>
+                </div>
+              )}
+              <div className="flex-1">
+                <SongCard
+                  song={playlistSong.song}
+                  state={playlistSong.state}
+                  showStateIcon
+                  isClickable
+                  onClick={() => onSongClick?.(playlistSong.id)}
+                />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 

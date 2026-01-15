@@ -553,6 +553,177 @@ describe('playlistStore', () => {
     });
   });
 
+  describe('reorderSong', () => {
+    it('should move song from one position to another', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_3', song: { title: 'Song 3', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      // Move song at index 0 to index 2
+      usePlaylistStore.getState().reorderSong(0, 2);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_2');
+      expect(songs[1].id).toBe('song_3');
+      expect(songs[2].id).toBe('song_1');
+    });
+
+    it('should move song from later position to earlier position', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_3', song: { title: 'Song 3', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      // Move song at index 2 to index 0
+      usePlaylistStore.getState().reorderSong(2, 0);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_3');
+      expect(songs[1].id).toBe('song_1');
+      expect(songs[2].id).toBe('song_2');
+    });
+
+    it('should not change order when fromIndex equals toIndex', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(1, 1);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_1');
+      expect(songs[1].id).toBe('song_2');
+    });
+
+    it('should not change order when fromIndex is negative', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(-1, 0);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_1');
+      expect(songs[1].id).toBe('song_2');
+    });
+
+    it('should not change order when toIndex is negative', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(0, -1);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_1');
+      expect(songs[1].id).toBe('song_2');
+    });
+
+    it('should not change order when fromIndex is out of bounds', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(5, 0);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_1');
+      expect(songs[1].id).toBe('song_2');
+    });
+
+    it('should not change order when toIndex is out of bounds', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(0, 5);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_1');
+      expect(songs[1].id).toBe('song_2');
+    });
+
+    it('should work with adjacent positions', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_3', song: { title: 'Song 3', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      // Move song at index 0 to index 1
+      usePlaylistStore.getState().reorderSong(0, 1);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].id).toBe('song_2');
+      expect(songs[1].id).toBe('song_1');
+      expect(songs[2].id).toBe('song_3');
+    });
+
+    it('should preserve song state when reordering', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+          { id: 'song_2', song: { title: 'Song 2', artist: 'Artist' }, spotifyTrack: null, state: 'pending' },
+          { id: 'song_3', song: { title: 'Song 3', artist: 'Artist' }, spotifyTrack: null, state: 'markedForRemoval' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(0, 2);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs[0].state).toBe('pending');
+      expect(songs[1].state).toBe('markedForRemoval');
+      expect(songs[2].state).toBe('synced');
+    });
+
+    it('should handle empty playlist gracefully', () => {
+      usePlaylistStore.setState({ songs: [] });
+
+      usePlaylistStore.getState().reorderSong(0, 1);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(0);
+    });
+
+    it('should handle single song playlist gracefully', () => {
+      usePlaylistStore.setState({
+        songs: [
+          { id: 'song_1', song: { title: 'Song 1', artist: 'Artist' }, spotifyTrack: null, state: 'synced' },
+        ],
+      });
+
+      usePlaylistStore.getState().reorderSong(0, 0);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(1);
+      expect(songs[0].id).toBe('song_1');
+    });
+  });
+
   describe('persistence', () => {
     it('should use the correct storage key', () => {
       expect(PLAYLIST_STORAGE_KEY).toBe('playlist-storage');

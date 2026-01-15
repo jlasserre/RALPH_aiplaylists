@@ -20,6 +20,8 @@ interface RightPanelProps {
   isLoading?: boolean;
   /** Callback when a candidate is dropped onto the playlist */
   onCandidateDrop?: (candidateId: string) => void;
+  /** Callback when songs are reordered via drag and drop */
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export function RightPanel({
   isReadOnly = false,
   isLoading = false,
   onCandidateDrop,
+  onReorder,
 }: RightPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -70,6 +73,7 @@ export function RightPanel({
           isSaving={isSaving}
           isReadOnly={isReadOnly}
           onCandidateDrop={onCandidateDrop}
+          onReorder={onReorder}
         />
       )}
     </div>

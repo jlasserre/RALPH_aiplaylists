@@ -34,6 +34,8 @@ interface PlaylistActions {
   markPendingAsSynced: () => void;
   /** Remove all songs marked for removal (after successful sync) */
   removeMarkedSongs: () => void;
+  /** Reorder a song by moving it from one index to another */
+  reorderSong: (fromIndex: number, toIndex: number) => void;
 }
 
 type PlaylistStore = PlaylistState & PlaylistActions;
@@ -147,6 +149,25 @@ export const usePlaylistStore = create<PlaylistStore>()(
         set((state) => ({
           songs: state.songs.filter((song) => song.state !== 'markedForRemoval'),
         })),
+
+      reorderSong: (fromIndex: number, toIndex: number) =>
+        set((state) => {
+          // Validate indices
+          if (
+            fromIndex < 0 ||
+            fromIndex >= state.songs.length ||
+            toIndex < 0 ||
+            toIndex >= state.songs.length ||
+            fromIndex === toIndex
+          ) {
+            return state;
+          }
+
+          const newSongs = [...state.songs];
+          const [movedSong] = newSongs.splice(fromIndex, 1);
+          newSongs.splice(toIndex, 0, movedSong);
+          return { songs: newSongs };
+        }),
     }),
     {
       name: PLAYLIST_STORAGE_KEY,

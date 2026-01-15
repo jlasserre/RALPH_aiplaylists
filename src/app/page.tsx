@@ -34,6 +34,7 @@ export default function Home() {
   const markPendingAsSynced = usePlaylistStore((state) => state.markPendingAsSynced);
   const removeMarkedSongs = usePlaylistStore((state) => state.removeMarkedSongs);
   const setIsOwned = usePlaylistStore((state) => state.setIsOwned);
+  const reorderSong = usePlaylistStore((state) => state.reorderSong);
 
   // Candidate state and actions
   const candidates = useCandidateStore((state) => state.candidates);
@@ -796,6 +797,7 @@ export default function Home() {
             isReadOnly={isReadOnly}
             isLoading={isLoadingPlaylistTracks}
             onCandidateDrop={handleCandidateDrop}
+            onReorder={reorderSong}
           />
         }
       />
