@@ -689,8 +689,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 40,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implementation was already complete from previous stories. handleSongClick in page.tsx handles both toggle removal (synced ↔ markedForRemoval) and pending song removal. SongCard displays appropriate icons. All 342 tests pass."
     },
     {
       "id": "US-041",

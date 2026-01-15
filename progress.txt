@@ -594,3 +594,26 @@
   - The conflict detection only checks owned playlists since followed playlists can't be modified anyway
   - ConflictResolution type uses discriminated unions (type: 'add-to-existing' | 'replace-contents' | 'use-different-name' | 'cancel') for type-safe resolution handling
 ---
+
+## 2026-01-15 - US-040
+- What was implemented: Verified toggle removal in right panel is already working (implementation from previous stories)
+- Files changed: None (implementation was already complete)
+- **Verification results:**
+  - handleSongClick() in page.tsx (lines 170-179) correctly handles:
+    - Synced songs → calls toggleRemoval() to mark as markedForRemoval
+    - MarkedForRemoval songs → calls toggleRemoval() to restore to synced
+    - Pending songs → calls removePending() to remove entirely from playlist
+  - toggleRemoval() in playlistStore.ts toggles between synced ↔ markedForRemoval states
+  - removePending() in playlistStore.ts removes only songs that are pending state
+  - SongCard displays appropriate icons:
+    - Green music note for synced
+    - Blue plus for pending
+    - Red forbidden symbol for markedForRemoval
+  - PlaylistView passes isClickable and onSongClick to all song cards
+  - All 342 tests pass including specific tests for toggleRemoval and removePending
+  - Typecheck passes
+- **Learnings for future iterations:**
+  - When acceptance criteria are already implemented by previous stories, the story becomes a verification checkpoint
+  - The toggle removal functionality was naturally implemented as part of US-026 (playlistStore), US-028 (usePlaylist hook), and US-030 (wiring page.tsx)
+  - Test coverage is comprehensive: toggleRemoval tests synced→markedForRemoval, markedForRemoval→synced, no effect on pending, only specified song affected
+---
