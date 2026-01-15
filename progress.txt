@@ -572,3 +572,25 @@
   - Browser verification using localStorage manipulation is effective for testing different song states without needing real Spotify auth
   - The song state icons (synced/pending/markedForRemoval) properly display in the UI, confirming the PlaylistView component works correctly
 ---
+
+## 2026-01-15 - US-039
+- What was implemented: Playlist name conflict detection and resolution dialog
+- Files changed:
+  - src/components/features/playlist/NameConflictDialog.tsx - New dialog component with three resolution options
+  - src/components/features/playlist/index.ts - Added export for NameConflictDialog and ConflictResolution type
+  - src/app/page.tsx - Added conflict detection and resolution handlers, refactored playlist creation flow
+- **Implementation details:**
+  - NameConflictDialog shows when user tries to create a playlist with a name that already exists (case-insensitive match)
+  - Three options: "Add new songs to it" (append to existing), "Replace its current contents" (clear and add), "Create with different name" (shows name input)
+  - findConflictingPlaylist() checks userPlaylists for name matches (only owned playlists)
+  - createPlaylistOnSpotify() extracted for reuse across different resolution paths
+  - addSongsToExistingPlaylist() adds tracks to an existing playlist
+  - replacePlaylistContents() removes all tracks then adds new ones
+  - finalizePlaylistCreation() updates store state and shows success message
+  - handleConflictResolution() routes to appropriate action based on user's choice
+- **Learnings for future iterations:**
+  - The NameConflictDialog returns nothing when isOpen=false, so it doesn't affect the DOM when hidden
+  - For testing UI components without API access, create a test page that mounts the component in isolation
+  - The conflict detection only checks owned playlists since followed playlists can't be modified anyway
+  - ConflictResolution type uses discriminated unions (type: 'add-to-existing' | 'replace-contents' | 'use-different-name' | 'cancel') for type-safe resolution handling
+---
