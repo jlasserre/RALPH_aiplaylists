@@ -6,6 +6,7 @@
 - Jest 30 with next/jest helper for Next.js integration
 - Tests co-located with source files (`.test.ts`, `.test.tsx`)
 - localStorage is mocked in jest.setup.js - mocks auto-clear before each test
+- Web Crypto API (TextEncoder, crypto.subtle) polyfilled in jest.setup.js for jsdom
 
 ---
 
@@ -51,4 +52,40 @@
   - Jest 30 works with Next.js 16 - no compatibility issues
   - localStorage mock should clear mocks in beforeEach to ensure test isolation
   - The `typecheck` script (`tsc --noEmit`) is useful for CI validation
+---
+
+## 2026-01-15 - US-003
+- What was implemented: PKCE utility functions for Spotify OAuth
+- Files changed:
+  - src/lib/spotify/auth.ts - created with generateCodeVerifier, generateCodeChallenge, generateRandomState functions
+  - src/lib/spotify/auth.test.ts - comprehensive tests for all PKCE functions
+  - jest.setup.js - added TextEncoder, TextDecoder, and crypto.subtle polyfills for Web Crypto API support
+- **Learnings for future iterations:**
+  - jsdom environment doesn't include TextEncoder/TextDecoder - import from 'util' and set on global
+  - jsdom doesn't have crypto.subtle - use webcrypto from 'crypto' module and define on global.crypto
+  - Jest 30 uses `--testPathPatterns` instead of `--testPathPattern` (or just pass file path directly)
+  - RFC 7636 PKCE test vector: verifier "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" produces challenge "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+---
+
+## 2026-01-15 - US-004
+- What was implemented: Spotify OAuth initiation API route
+- Files changed:
+  - src/app/api/auth/spotify/route.ts - GET handler that generates PKCE values, stores them in httpOnly cookies, and redirects to Spotify authorization
+- **Learnings for future iterations:**
+  - Next.js 16 cookies() is async - must await the call before using set()
+  - Cookie options: httpOnly for security, sameSite 'lax' for OAuth redirects, secure in production only
+  - Spotify OAuth scopes: playlist-read-private, playlist-modify-public, playlist-modify-private are needed for this app
+  - Store both code_verifier (for token exchange) and state (for CSRF protection) in cookies
+---
+
+## 2026-01-15 - US-005
+- What was implemented: Spotify OAuth callback API route that completes the PKCE flow
+- Files changed:
+  - src/app/api/auth/spotify/callback/route.ts - GET handler that exchanges auth code for tokens
+- **Learnings for future iterations:**
+  - When setting/deleting cookies in a redirect response, use `response.cookies.set()` and `response.cookies.delete()` instead of the `cookies()` store directly
+  - Spotify returns tokens as JSON with: access_token, token_type, scope, expires_in, refresh_token
+  - Store both refresh_token (30 days) and access_token (expires_in from response) in httpOnly cookies
+  - The access_token cookie is temporary - it will be read by /api/auth/refresh on page load
+  - Clear temporary OAuth cookies (state, code_verifier) on successful token exchange
 ---

@@ -64,8 +64,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented PKCE utilities with generateCodeVerifier, generateCodeChallenge, and generateRandomState. Added TextEncoder and crypto.subtle polyfills to jest.setup.js for Web Crypto API support in tests."
     },
     {
       "id": "US-004",
@@ -79,8 +79,8 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented OAuth initiation endpoint with PKCE support, httpOnly cookies for code verifier and state, and redirect to Spotify authorization."
     },
     {
       "id": "US-005",
@@ -97,8 +97,8 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented OAuth callback with PKCE token exchange. Stores refresh_token and access_token in httpOnly cookies. Clears temporary auth cookies on success. Redirects to home with auth=success parameter."
     },
     {
       "id": "US-006",
