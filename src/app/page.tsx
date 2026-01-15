@@ -30,6 +30,7 @@ export default function Home() {
   const setPlaylistId = usePlaylistStore((state) => state.setPlaylistId);
   const loadSongs = usePlaylistStore((state) => state.loadSongs);
   const markPendingAsSynced = usePlaylistStore((state) => state.markPendingAsSynced);
+  const removeMarkedSongs = usePlaylistStore((state) => state.removeMarkedSongs);
   const setIsOwned = usePlaylistStore((state) => state.setIsOwned);
 
   // Candidate state and actions
@@ -344,19 +345,110 @@ export default function Home() {
   ]);
 
   /**
+   * Handle updating an existing Spotify playlist
+   * Called when user clicks "Update Playlist" button
+   * Adds pending songs and removes markedForRemoval songs
+   */
+  const handleUpdatePlaylist = useCallback(async () => {
+    if (!accessToken) {
+      console.error('Not authenticated');
+      return;
+    }
+
+    if (!spotifyPlaylistId) {
+      console.error('No playlist ID to update');
+      return;
+    }
+
+    // Get songs that need to be added (pending songs)
+    const pendingSongs = songs.filter((s) => s.state === 'pending');
+
+    // Get songs that need to be removed (markedForRemoval songs)
+    const songsToRemove = songs.filter((s) => s.state === 'markedForRemoval');
+
+    // Check if there are any changes to sync
+    if (pendingSongs.length === 0 && songsToRemove.length === 0) {
+      console.warn('No changes to sync');
+      return;
+    }
+
+    // Get track URIs for songs to add
+    const addUris = pendingSongs
+      .map((s) => s.spotifyTrack?.uri)
+      .filter((uri): uri is string => !!uri);
+
+    // Get track URIs for songs to remove
+    const removeUris = songsToRemove
+      .map((s) => s.spotifyTrack?.uri)
+      .filter((uri): uri is string => !!uri);
+
+    // Check if we have valid URIs for changes
+    if (addUris.length === 0 && removeUris.length === 0) {
+      console.error('No valid track URIs found');
+      return;
+    }
+
+    setIsSaving(true);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch('/api/spotify/playlist', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlistId: spotifyPlaylistId,
+          addUris: addUris.length > 0 ? addUris : undefined,
+          removeUris: removeUris.length > 0 ? removeUris : undefined,
+          accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to update playlist:', errorData.message || response.status);
+        return;
+      }
+
+      const data: PlaylistCreateResponse = await response.json();
+
+      // Mark all pending songs as synced
+      markPendingAsSynced();
+
+      // Remove songs that were marked for removal
+      removeMarkedSongs();
+
+      // Show success message with link to playlist
+      setSuccessMessage({
+        message: 'Playlist updated successfully!',
+        playlistUrl: data.playlistUrl,
+      });
+    } catch (error) {
+      console.error('Error updating playlist:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    accessToken,
+    spotifyPlaylistId,
+    songs,
+    markPendingAsSynced,
+    removeMarkedSongs,
+  ]);
+
+  /**
    * Handle save action (create or update playlist)
-   * For US-037, this only handles create. US-038 will add update logic.
    */
   const handleSave = useCallback(() => {
-    // If we have an existing Spotify playlist that we own, update it (US-038)
+    // If we have an existing Spotify playlist that we own, update it
     // Otherwise, create a new playlist
     if (spotifyPlaylistId && isOwned) {
-      // TODO: US-038 will implement handleUpdatePlaylist
-      console.log('Update playlist flow - will be implemented in US-038');
+      handleUpdatePlaylist();
     } else {
       handleCreatePlaylist();
     }
-  }, [spotifyPlaylistId, isOwned, handleCreatePlaylist]);
+  }, [spotifyPlaylistId, isOwned, handleCreatePlaylist, handleUpdatePlaylist]);
 
   /**
    * Clear success message
