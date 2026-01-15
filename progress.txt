@@ -397,3 +397,17 @@
   - getMatchRate selector returns { matched, total, percentage } for display in UI
   - Use standalone selector functions (not store methods) for derived data: `getSelectedCandidates(useCandidateStore.getState())`
 ---
+
+## 2026-01-15 - US-028
+- What was implemented: usePlaylist hook for managing playlist with addSelectedToPlaylist functionality
+- Files changed:
+  - src/hooks/usePlaylist.ts - created hook with addSelectedToPlaylist, clearPlaylist, and selectors for hasPendingChanges/songCounts
+  - src/hooks/usePlaylist.test.ts - 22 tests covering all functionality
+- **Learnings for future iterations:**
+  - Candidate selector `getSelectedCandidates(state)` requires passing full state object { candidates, isLoading }
+  - When getting candidates from hook, use `useCandidateStore((state) => state.candidates)` to get reactive value
+  - addSongs from playlistStore requires spotifyTrack to be non-null, so filter candidates first
+  - clearPlaylist should clear both playlistStore and candidateStore for "New Playlist" flow
+  - songCounts helper provides counts by state (synced, pending, markedForRemoval, total) for UI display
+  - hasPendingChanges checks for any pending or markedForRemoval songs to determine if sync is needed
+---

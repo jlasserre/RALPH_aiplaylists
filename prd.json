@@ -490,8 +490,8 @@
         "Typecheck passes"
       ],
       "priority": 28,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created usePlaylist hook with addSelectedToPlaylist() that moves selected candidates to playlist store with 'pending' state and clears selection. Added hasPendingChanges and songCounts selectors. Also added clearPlaylist that clears both playlist and candidate stores. 22 tests covering all functionality."
     },
     {
       "id": "US-029",
