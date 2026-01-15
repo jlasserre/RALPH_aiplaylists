@@ -468,3 +468,18 @@
   - Response structure: `{ items: [{ track: SpotifyTrack | null, added_at, added_by }], next, ... }`
   - Pagination pattern similar to getUserPlaylists but with 100 max per page instead of 50
 ---
+
+## 2026-01-15 - US-033
+- What was implemented: Load Existing Playlist flow - dropdown to select user's playlists, fetch tracks from Spotify, populate right panel
+- Files changed:
+  - src/app/api/spotify/playlists/route.ts - created GET endpoint to fetch user's playlists with accessToken query param
+  - src/app/api/spotify/playlists/[playlistId]/tracks/route.ts - created GET endpoint to fetch playlist tracks
+  - src/components/layout/LeftPanel.tsx - updated dropdown to show playlists with track count and lock icon for followed
+  - src/app/page.tsx - added fetchUserPlaylists on auth, handleLoadExisting to load tracks and populate store
+- **Learnings for future iterations:**
+  - Next.js 16 dynamic route params are async - use `const { playlistId } = await params` in route handlers
+  - Pass accessToken via query params for GET requests (can't use body)
+  - Convert SpotifyTrack to Song format: title=name, artist=artists.map(...).join(', '), album=album.name
+  - For followed (read-only) playlists: clear playlist ID, clear name, songs get 'pending' state (loadSongs with isOwned=false)
+  - For owned playlists: set playlist ID, set name, songs get 'synced' state (loadSongs with isOwned=true)
+---

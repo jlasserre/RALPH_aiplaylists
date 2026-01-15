@@ -571,8 +571,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 33,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created /api/spotify/playlists and /api/spotify/playlists/[playlistId]/tracks endpoints. Updated LeftPanel to show playlists with lock icon for followed playlists. Wired up page.tsx to fetch playlists and load tracks. Verified in browser with dev-browser skill."
     },
     {
       "id": "US-034",
