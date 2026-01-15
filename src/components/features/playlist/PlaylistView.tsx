@@ -100,9 +100,10 @@ export function PlaylistView({
 
   /**
    * Handle drag start for reordering a song within the playlist
+   * Stores both the index (for reordering) and song ID (for removal)
    */
-  const handleSongDragStart = (e: DragEvent<HTMLDivElement>, index: number) => {
-    e.dataTransfer.setData(PLAYLIST_SONG_DRAG_TYPE, String(index));
+  const handleSongDragStart = (e: DragEvent<HTMLDivElement>, index: number, songId: string) => {
+    e.dataTransfer.setData(PLAYLIST_SONG_DRAG_TYPE, `${index}:${songId}`);
     e.dataTransfer.effectAllowed = 'move';
     setDraggedIndex(index);
   };
@@ -133,7 +134,9 @@ export function PlaylistView({
     e.preventDefault();
     e.stopPropagation();
 
-    const sourceIndex = parseInt(e.dataTransfer.getData(PLAYLIST_SONG_DRAG_TYPE), 10);
+    const dragData = e.dataTransfer.getData(PLAYLIST_SONG_DRAG_TYPE);
+    const [indexStr] = dragData.split(':');
+    const sourceIndex = parseInt(indexStr, 10);
     if (!isNaN(sourceIndex) && onReorder && sourceIndex !== targetIndex) {
       onReorder(sourceIndex, targetIndex);
     }
@@ -286,7 +289,7 @@ export function PlaylistView({
           <div
             key={playlistSong.id}
             draggable={!!onReorder}
-            onDragStart={(e) => handleSongDragStart(e, index)}
+            onDragStart={(e) => handleSongDragStart(e, index, playlistSong.id)}
             onDragEnd={handleSongDragEnd}
             onDragOver={(e) => handleSongDragOver(e, index)}
             onDrop={(e) => handleSongDrop(e, index)}

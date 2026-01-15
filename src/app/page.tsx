@@ -211,6 +211,24 @@ export default function Home() {
   );
 
   /**
+   * Handle dropping a playlist song onto the middle panel for removal.
+   * Synced songs become markedForRemoval, pending songs are removed entirely.
+   */
+  const handlePlaylistSongDrop = useCallback(
+    (songId: string) => {
+      const song = songs.find((s) => s.id === songId);
+      if (!song) return;
+
+      if (song.state === 'pending') {
+        removePending(songId);
+      } else {
+        toggleRemoval(songId);
+      }
+    },
+    [songs, removePending, toggleRemoval]
+  );
+
+  /**
    * Handle song generation flow:
    * 1. Call /api/generate to get song suggestions from LLM
    * 2. Call /api/spotify/search to find tracks on Spotify
@@ -785,6 +803,7 @@ export default function Home() {
             onToggleSelection={toggleSelection}
             onAddSelected={handleAddSelected}
             isLoading={isLoadingCandidates}
+            onPlaylistSongDrop={handlePlaylistSongDrop}
           />
         }
         rightPanel={
