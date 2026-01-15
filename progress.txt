@@ -325,3 +325,15 @@
   - Default similarity threshold of 0.8 works well for common typos while avoiding false positives
   - Import SpotifyTrack type from @/types to maintain consistency with the type system
 ---
+
+## 2026-01-15 - US-023
+- What was implemented: Spotify search API endpoint for batch song searches
+- Files changed:
+  - src/app/api/spotify/search/route.ts - POST handler for searching multiple songs on Spotify with concurrency control
+- **Learnings for future iterations:**
+  - Use a simple executeWithConcurrency helper to limit parallel async operations (avoids rate limiting)
+  - SpotifySearchResult and SpotifySearchResponse types were already defined in @/types - reuse existing types
+  - Include both error code (AUTH_ERROR, RATE_LIMIT, SPOTIFY_ERROR) and message in error responses for better client handling
+  - Pass Retry-After header through from SpotifyRateLimitError for proper backoff in clients
+  - Validate each song in array individually to provide clear error messages with index
+---
