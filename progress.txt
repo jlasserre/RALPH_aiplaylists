@@ -1,0 +1,24 @@
+## Codebase Patterns
+- Next.js 16.1.2 with App Router (src/app/ directory structure)
+- TypeScript strict mode enabled
+- Tailwind CSS v4 with `@import "tailwindcss"` syntax
+- Path alias `@/*` maps to `./src/*`
+
+---
+
+## 2026-01-15 - US-001
+- What was implemented: Initialized Next.js project with TypeScript and Tailwind CSS
+- Files changed:
+  - package.json - project config with ai-playlist-generator name
+  - tsconfig.json - TypeScript config with strict mode
+  - src/app/layout.tsx - root layout with metadata
+  - src/app/page.tsx - basic home page component
+  - src/app/globals.css - Tailwind CSS imports and theme variables
+  - eslint.config.mjs - ESLint configuration
+  - next.config.ts - Next.js configuration
+  - postcss.config.mjs - PostCSS config for Tailwind
+- **Learnings for future iterations:**
+  - create-next-app refuses to create projects in directories with capital letters in the name - use temp directory workaround
+  - next-env.d.ts is auto-generated and gitignored - don't try to add it
+  - Next.js 16 uses Tailwind v4 with new `@import "tailwindcss"` syntax instead of @tailwind directives
+---

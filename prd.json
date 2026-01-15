@@ -1,0 +1,1067 @@
+{
+  "project": "AI Playlist Generator",
+  "branchName": "ralph/ai-playlist-generator",
+  "description": "Next.js web app that generates Spotify playlists using LLM (Claude/OpenAI) based on user descriptions with a three-panel UI",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Initialize Next.js project with TypeScript and Tailwind",
+      "description": "As a developer, I need the base project structure set up with Next.js 14 App Router, TypeScript, and Tailwind CSS.",
+      "acceptanceCriteria": [
+        "Next.js 14 project initialized with App Router",
+        "TypeScript configured",
+        "Tailwind CSS configured with globals.css",
+        "Project runs with 'npm run dev'",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Initialized with Next.js 16.1.2 (latest available version with App Router)"
+    },
+    {
+      "id": "US-002",
+      "title": "Install dependencies and create environment config",
+      "description": "As a developer, I need all required dependencies installed and environment variables configured.",
+      "acceptanceCriteria": [
+        "Install zustand, @anthropic-ai/sdk, openai packages",
+        "Create .env.local.example with NEXT_PUBLIC_SPOTIFY_CLIENT_ID, NEXT_PUBLIC_SPOTIFY_REDIRECT_URI, OPENAI_API_KEY, ANTHROPIC_API_KEY, LLM_DEFAULT_PROVIDER",
+        "Create src/types/index.ts with base type exports",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002b",
+      "title": "Set up Jest and React Testing Library",
+      "description": "As a developer, I need the testing infrastructure configured for unit and component tests.",
+      "acceptanceCriteria": [
+        "Install jest, @testing-library/react, @testing-library/jest-dom, jest-environment-jsdom",
+        "Create jest.config.js with jsdom environment and Next.js support",
+        "Create jest.setup.js with localStorage mock and @testing-library/jest-dom import",
+        "Add test script to package.json",
+        "Create a sample test file to verify setup works",
+        "npm test runs successfully",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Create PKCE utility functions for Spotify OAuth",
+      "description": "As a developer, I need PKCE code verifier and challenge generation utilities for secure OAuth.",
+      "acceptanceCriteria": [
+        "Create src/lib/spotify/auth.ts",
+        "Implement generateCodeVerifier() returning random 43-128 char string",
+        "Implement generateCodeChallenge(verifier) returning base64url SHA-256 hash",
+        "Implement generateRandomState() for CSRF protection",
+        "Export all functions",
+        "Create src/lib/spotify/auth.test.ts with tests for all functions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create Spotify OAuth initiation API route",
+      "description": "As a user, I want to start the Spotify login flow by being redirected to Spotify authorization.",
+      "acceptanceCriteria": [
+        "Create /api/auth/spotify/route.ts",
+        "GET handler generates code verifier, challenge, and state",
+        "Store code verifier in httpOnly cookie",
+        "Redirect to Spotify authorization URL with correct scopes (playlist-read-private, playlist-modify-public, playlist-modify-private)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create Spotify OAuth callback API route",
+      "description": "As a user, I want to complete the Spotify login and receive tokens after authorization.",
+      "acceptanceCriteria": [
+        "Create /api/auth/spotify/callback/route.ts",
+        "GET handler reads authorization code and state from query params",
+        "Retrieve code verifier from cookie",
+        "Exchange code for access_token and refresh_token with Spotify",
+        "Store refresh_token in httpOnly secure cookie",
+        "Return access_token in JSON response",
+        "Redirect to home page with success indicator",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Create token refresh API route",
+      "description": "As a user, I want my session to persist by refreshing expired access tokens.",
+      "acceptanceCriteria": [
+        "Create /api/auth/refresh/route.ts",
+        "POST handler reads refresh_token from httpOnly cookie",
+        "Call Spotify token endpoint to get new access_token",
+        "Return new access_token in JSON response",
+        "Return 401 if no refresh token or refresh fails",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create auth Zustand store",
+      "description": "As a developer, I need centralized auth state management with access token in memory.",
+      "acceptanceCriteria": [
+        "Create src/store/authStore.ts",
+        "Store access_token in memory (not persisted)",
+        "Store isAuthenticated boolean",
+        "Store isLoading boolean for auth operations",
+        "Implement setAccessToken(token) action",
+        "Implement clearAuth() action",
+        "Create src/store/authStore.test.ts with tests for store actions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Create useSpotifyAuth hook with auto-refresh",
+      "description": "As a developer, I need a hook that handles auth initialization and token refresh on page load.",
+      "acceptanceCriteria": [
+        "Create src/hooks/useSpotifyAuth.ts",
+        "On mount, call /api/auth/refresh to get access token from cookie",
+        "Store retrieved token in authStore",
+        "Export login() function that redirects to /api/auth/spotify",
+        "Export logout() function that clears auth state",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Create base UI components",
+      "description": "As a developer, I need reusable UI components for buttons, inputs, and cards.",
+      "acceptanceCriteria": [
+        "Create src/components/ui/Button.tsx with variants (primary, secondary, ghost)",
+        "Create src/components/ui/Input.tsx with label support",
+        "Create src/components/ui/TextArea.tsx with character count",
+        "Create src/components/ui/Card.tsx with optional header",
+        "Create src/components/ui/Checkbox.tsx with label",
+        "All components use Tailwind CSS",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Create ThreePanelLayout component",
+      "description": "As a user, I want to see the app in a three-panel layout optimized for desktop/tablet.",
+      "acceptanceCriteria": [
+        "Create src/components/layout/ThreePanelLayout.tsx",
+        "Layout has left (controls), middle (candidates), right (playlist) panels",
+        "Panels are responsive for tablet and desktop (not mobile)",
+        "Left panel is narrower, middle and right panels share remaining space",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Create LeftPanel with playlist controls",
+      "description": "As a user, I want controls for creating/loading playlists, selecting LLM, entering prompts.",
+      "acceptanceCriteria": [
+        "Create src/components/layout/LeftPanel.tsx",
+        "Include 'New Playlist' button",
+        "Include 'Load Existing' dropdown placeholder",
+        "Include LLM provider dropdown (Claude/OpenAI)",
+        "Include playlist name input field",
+        "Include prompt textarea (min 10, max 5000 chars)",
+        "Include 'Suggest songs' button",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Create MiddlePanel with candidate list",
+      "description": "As a user, I want to see song candidates from the current generation in the middle panel.",
+      "acceptanceCriteria": [
+        "Create src/components/layout/MiddlePanel.tsx",
+        "Create src/components/features/playlist/CandidateList.tsx",
+        "Display list of candidate songs with checkboxes",
+        "Include 'Add Selected' button at bottom",
+        "Show empty state when no candidates",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Create RightPanel with playlist view",
+      "description": "As a user, I want to see my accumulated playlist songs in the right panel.",
+      "acceptanceCriteria": [
+        "Create src/components/layout/RightPanel.tsx",
+        "Create src/components/features/playlist/PlaylistView.tsx",
+        "Display list of playlist songs with state icons",
+        "Include 'Create Playlist' / 'Update Playlist' button at bottom",
+        "Show empty state when no songs",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Create SongCard component with state icons",
+      "description": "As a user, I want to see song information with visual indicators for sync state.",
+      "acceptanceCriteria": [
+        "Create src/components/features/playlist/SongCard.tsx",
+        "Display song title, artist, album (if available)",
+        "Show state icons: synced (music note), pending (+), marked for removal (forbidden)",
+        "Include tooltips explaining each state",
+        "Support click handler for toggling removal state",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Create LLM types and prompt templates",
+      "description": "As a developer, I need type definitions and prompt templates for LLM song generation.",
+      "acceptanceCriteria": [
+        "Create src/types/song.ts with Song interface (title, artist, album?, year?)",
+        "Create src/lib/llm/prompts.ts with song generation system prompt",
+        "Prompt instructs LLM to return JSON array of songs matching description",
+        "Include prompt for playlist name suggestion",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement Claude LLM client",
+      "description": "As a developer, I need a Claude client for generating song suggestions.",
+      "acceptanceCriteria": [
+        "Create src/lib/llm/claude.ts",
+        "Implement ClaudeClient class with generateSongs(prompt) method",
+        "Use @anthropic-ai/sdk with ANTHROPIC_API_KEY",
+        "Parse response into Song[] array",
+        "Handle API errors gracefully",
+        "Create src/lib/llm/claude.test.ts with mocked API tests",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement OpenAI LLM client",
+      "description": "As a developer, I need an OpenAI client as alternative LLM provider.",
+      "acceptanceCriteria": [
+        "Create src/lib/llm/openai.ts",
+        "Implement OpenAIClient class with generateSongs(prompt) method",
+        "Use openai SDK with OPENAI_API_KEY",
+        "Parse response into Song[] array",
+        "Handle API errors gracefully",
+        "Create src/lib/llm/openai.test.ts with mocked API tests",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Create LLM factory with provider selection",
+      "description": "As a developer, I need a factory to instantiate the correct LLM client based on user selection.",
+      "acceptanceCriteria": [
+        "Create src/lib/llm/index.ts",
+        "Export getLLMClient(provider: 'claude' | 'openai') factory function",
+        "Returns ClaudeClient or OpenAIClient based on provider",
+        "Export LLMProvider type",
+        "Create src/lib/llm/index.test.ts with factory tests",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Create song generation API endpoint",
+      "description": "As a user, I want to generate song suggestions by sending a prompt to the LLM.",
+      "acceptanceCriteria": [
+        "Create /api/generate/route.ts",
+        "POST handler accepts { prompt: string, provider: 'claude' | 'openai' }",
+        "Validate prompt length (10-5000 chars)",
+        "Call LLM client to generate songs",
+        "Return { songs: Song[] } on success",
+        "Return appropriate error messages on failure",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Create playlist name suggestion API endpoint",
+      "description": "As a user, I want the LLM to suggest a playlist name based on my prompt.",
+      "acceptanceCriteria": [
+        "Create /api/generate/suggest-name/route.ts",
+        "POST handler accepts { prompt: string, provider: 'claude' | 'openai' }",
+        "Call LLM with name suggestion prompt",
+        "Return { name: string } on success",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Create SpotifyClient class with auth handling",
+      "description": "As a developer, I need a Spotify API client that handles authenticated requests.",
+      "acceptanceCriteria": [
+        "Create src/lib/spotify/api.ts",
+        "SpotifyClient class accepts access_token in constructor",
+        "Implement private fetch wrapper with Authorization header",
+        "Handle 401 responses by throwing AuthError",
+        "Handle rate limiting (429) with appropriate error",
+        "Create src/lib/spotify/api.test.ts with mocked fetch tests",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement Spotify track search with fuzzy matching",
+      "description": "As a developer, I need to search Spotify for tracks matching LLM suggestions.",
+      "acceptanceCriteria": [
+        "Add searchTrack(title, artist) method to SpotifyClient",
+        "Search Spotify API with track:title artist:artist query",
+        "Implement fuzzy matching to handle slight title/artist variations",
+        "Return SpotifyTrack with id, uri, name, artists, album, or null if not found",
+        "Add tests for fuzzy matching logic to api.test.ts",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Create Spotify search API endpoint",
+      "description": "As a developer, I need an API endpoint to search Spotify for songs.",
+      "acceptanceCriteria": [
+        "Create /api/spotify/search/route.ts",
+        "POST handler accepts { songs: Song[], accessToken: string }",
+        "Search each song on Spotify with concurrency limit (5 parallel)",
+        "Return { results: Array<{ song: Song, spotifyTrack: SpotifyTrack | null }> }",
+        "Include match rate in response",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Create Spotify playlist API endpoint",
+      "description": "As a user, I want to create or update Spotify playlists with my selected songs.",
+      "acceptanceCriteria": [
+        "Create /api/spotify/playlist/route.ts",
+        "POST handler creates new playlist with name and track URIs",
+        "PUT handler updates existing playlist (add/remove tracks)",
+        "Accept { name, trackUris, accessToken } for POST",
+        "Accept { playlistId, addUris, removeUris, accessToken } for PUT",
+        "Return { playlistId, playlistUrl } on success",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Add Spotify recommendations API for More Like This",
+      "description": "As a developer, I need to fetch song recommendations based on a seed track.",
+      "acceptanceCriteria": [
+        "Add getRecommendations(seedTrackId, limit) method to SpotifyClient",
+        "Call Spotify recommendations API with seed_tracks parameter",
+        "Return array of SpotifyTrack objects",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Create playlist Zustand store",
+      "description": "As a developer, I need centralized state for the user's playlist with song states.",
+      "acceptanceCriteria": [
+        "Create src/store/playlistStore.ts",
+        "Store playlist name, spotifyPlaylistId (if loaded/created)",
+        "Store songs array with state (synced, pending, markedForRemoval)",
+        "Implement addSongs(songs) action",
+        "Implement toggleRemoval(songId) action",
+        "Implement removePending(songId) action",
+        "Implement clearPlaylist() action",
+        "Implement setPlaylistId(id) action",
+        "Create src/store/playlistStore.test.ts with tests for all actions",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Create candidate Zustand store",
+      "description": "As a developer, I need state management for current generation candidates.",
+      "acceptanceCriteria": [
+        "Create src/store/candidateStore.ts",
+        "Store candidates array with selection state and Spotify match result",
+        "Implement setCandidates(songs) action",
+        "Implement toggleSelection(songId) action",
+        "Implement clearCandidates() action",
+        "Implement getSelectedCandidates() selector",
+        "Create src/store/candidateStore.test.ts with tests for all actions and selectors",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Wire up candidate selection to playlist",
+      "description": "As a user, I want to add selected candidates to my playlist.",
+      "acceptanceCriteria": [
+        "Create usePlaylist hook in src/hooks/usePlaylist.ts",
+        "Implement addSelectedToPlaylist() that moves selected candidates to playlist store",
+        "Selected songs become 'pending' state in playlist",
+        "Clear selection after adding",
+        "Create src/hooks/usePlaylist.test.ts with tests for hook logic",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Implement session persistence in localStorage",
+      "description": "As a user, I want my playlist session to persist across page refreshes.",
+      "acceptanceCriteria": [
+        "Add persist middleware to playlistStore using Zustand persist",
+        "Store playlist name, songs, spotifyPlaylistId in localStorage",
+        "Restore session on page load",
+        "Clear session on 'New Playlist' click",
+        "Add tests for persistence behavior using mocked localStorage",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-030",
+      "title": "Implement New Playlist flow",
+      "description": "As a user, I want to start fresh with an empty playlist.",
+      "acceptanceCriteria": [
+        "New Playlist button clears playlist store",
+        "Clears candidate store",
+        "Resets playlist name to empty",
+        "Clears spotifyPlaylistId",
+        "Right panel shows empty state",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 30,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-031",
+      "title": "Add user playlists fetching to SpotifyClient",
+      "description": "As a developer, I need to fetch the user's Spotify playlists for the Load Existing feature.",
+      "acceptanceCriteria": [
+        "Add getUserPlaylists() method to SpotifyClient",
+        "Fetch from /v1/me/playlists endpoint",
+        "Return array with id, name, owner, isOwned flag",
+        "Handle pagination if user has many playlists",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-032",
+      "title": "Add playlist tracks fetching to SpotifyClient",
+      "description": "As a developer, I need to fetch tracks from an existing Spotify playlist.",
+      "acceptanceCriteria": [
+        "Add getPlaylistTracks(playlistId) method to SpotifyClient",
+        "Fetch from /v1/playlists/{id}/tracks endpoint",
+        "Return array of SpotifyTrack objects",
+        "Handle pagination for large playlists",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-033",
+      "title": "Implement Load Existing Playlist flow",
+      "description": "As a user, I want to load an existing Spotify playlist to edit.",
+      "acceptanceCriteria": [
+        "Load Existing dropdown shows user's playlists",
+        "Followed/non-owned playlists marked with lock icon",
+        "Selecting playlist fetches tracks from Spotify",
+        "Tracks populate right panel with 'synced' state",
+        "Store spotifyPlaylistId for owned playlists",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-034",
+      "title": "Handle read-only playlists",
+      "description": "As a user, I want clear feedback when loading a playlist I don't own.",
+      "acceptanceCriteria": [
+        "Show banner: 'This playlist is read-only. Changes will create a new playlist.'",
+        "Songs marked as 'pending' instead of 'synced'",
+        "Playlist name field cleared for user to enter new name",
+        "Button shows 'Create Playlist' instead of 'Update Playlist'",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-035",
+      "title": "Implement song generation flow end-to-end",
+      "description": "As a user, I want to enter a prompt and see generated song candidates.",
+      "acceptanceCriteria": [
+        "Enter prompt in left panel textarea",
+        "Click 'Suggest songs' button",
+        "Show loading skeleton in middle panel",
+        "Call /api/generate with prompt and selected LLM provider",
+        "Call /api/spotify/search to find tracks",
+        "Display candidates in middle panel with match status",
+        "Unmatched songs show 'Not found' badge and are not selectable",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-036",
+      "title": "Implement Add Selected to playlist flow",
+      "description": "As a user, I want to add selected candidates to my playlist.",
+      "acceptanceCriteria": [
+        "Check multiple songs in candidate list",
+        "Click 'Add Selected' button",
+        "Selected songs move to right panel with 'pending' state",
+        "Selections cleared in middle panel",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 36,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-037",
+      "title": "Implement Create Playlist flow",
+      "description": "As a user, I want to create a new Spotify playlist with my selected songs.",
+      "acceptanceCriteria": [
+        "Click 'Create Playlist' button with pending songs",
+        "Call /api/spotify/playlist POST with name and track URIs",
+        "On success, store spotifyPlaylistId",
+        "Update song states from 'pending' to 'synced'",
+        "Button changes to 'Update Playlist'",
+        "Show success message with link to playlist",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 37,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-038",
+      "title": "Implement Update Playlist flow",
+      "description": "As a user, I want to update my existing Spotify playlist with changes.",
+      "acceptanceCriteria": [
+        "Click 'Update Playlist' with pending additions or marked removals",
+        "Call /api/spotify/playlist PUT with playlistId, add URIs, remove URIs",
+        "On success, update song states appropriately",
+        "Remove 'markedForRemoval' songs from list",
+        "Change 'pending' songs to 'synced'",
+        "Show success message",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 38,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-039",
+      "title": "Implement playlist name conflict detection",
+      "description": "As a user, I want to be warned if my playlist name already exists.",
+      "acceptanceCriteria": [
+        "Before creating playlist, check if name exists in user's playlists",
+        "If conflict, show dialog with options: Add to existing, Replace contents, Use different name",
+        "Handle each option appropriately",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 39,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-040",
+      "title": "Implement toggle removal in right panel",
+      "description": "As a user, I want to click synced songs to mark them for removal.",
+      "acceptanceCriteria": [
+        "Click on synced song toggles to 'markedForRemoval' state",
+        "Click on markedForRemoval song toggles back to 'synced'",
+        "Visual icon changes between music note and forbidden symbol",
+        "Pending songs can be removed entirely by clicking",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 40,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-041",
+      "title": "Add drag and drop from middle to right panel",
+      "description": "As a user, I want to drag candidates to add them to my playlist.",
+      "acceptanceCriteria": [
+        "Songs in middle panel are draggable",
+        "Right panel is a drop zone with visual highlight on dragover",
+        "Dropping adds song to playlist with 'pending' state",
+        "Only matched songs can be dragged",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-042",
+      "title": "Add drag and drop reordering within right panel",
+      "description": "As a user, I want to reorder songs in my playlist by dragging.",
+      "acceptanceCriteria": [
+        "Songs in right panel can be dragged to reorder",
+        "Visual indicator shows drop position",
+        "Reordering updates store immediately",
+        "Order preserved when syncing to Spotify",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-043",
+      "title": "Add drag from right to middle for removal",
+      "description": "As a user, I want to drag songs from right panel to remove them.",
+      "acceptanceCriteria": [
+        "Synced songs dragged to middle panel become 'markedForRemoval'",
+        "Pending songs dragged to middle panel are removed from playlist entirely",
+        "Middle panel shows drop zone indicator when dragging from right",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 43,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-044",
+      "title": "Implement More Like This feature",
+      "description": "As a user, I want to get similar song suggestions for a specific song.",
+      "acceptanceCriteria": [
+        "Add 'More Like This' button/icon to SongCard",
+        "Clicking fetches recommendations from Spotify API using song as seed",
+        "Insert recommendations after the source song, auto-selected",
+        "Works for songs in both middle and right panels",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 44,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-045",
+      "title": "Add song tagging UI",
+      "description": "As a user, I want to tag multiple songs to generate a prompt from them.",
+      "acceptanceCriteria": [
+        "Add tag toggle icon to SongCard",
+        "Clicking toggles tagged state",
+        "Tagged songs have visual indicator",
+        "Tags work in both middle and right panels",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 45,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-046",
+      "title": "Implement Generate Prompt From Tagged feature",
+      "description": "As a user, I want to generate a prompt based on my tagged songs.",
+      "acceptanceCriteria": [
+        "Show 'Generate Prompt' button when songs are tagged",
+        "Clicking generates prompt: 'Songs similar to [Song A] by [Artist], [Song B]...'",
+        "Prompt appears in left panel textarea",
+        "User can edit before generating",
+        "Clear tags after prompt is generated",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 46,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-047",
+      "title": "Update generated prompt when tags change",
+      "description": "As a user, I want the generated prompt to update as I tag/untag songs.",
+      "acceptanceCriteria": [
+        "If prompt was generated from tags and user changes tags, update prompt",
+        "Adding new tag adds song to prompt",
+        "Removing tag removes song from prompt",
+        "Manual edits to prompt disable auto-update",
+        "Typecheck passes"
+      ],
+      "priority": 47,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-048",
+      "title": "Add skeleton loaders for loading states",
+      "description": "As a user, I want visual feedback while waiting for song generation.",
+      "acceptanceCriteria": [
+        "Create skeleton loader component for song cards",
+        "Show 5-10 skeleton cards in middle panel during generation",
+        "Show skeleton in right panel while loading existing playlist",
+        "Smooth transition from skeleton to actual content",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 48,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-049",
+      "title": "Add streaming song results display",
+      "description": "As a user, I want to see songs as they are found rather than waiting for all.",
+      "acceptanceCriteria": [
+        "Display Spotify search results incrementally as they complete",
+        "Show match rate updating: 'X of Y songs found'",
+        "Replace skeleton with actual song card as each search completes",
+        "Allow user to select songs while others are still loading",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 49,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-050",
+      "title": "Add cancel generation button",
+      "description": "As a user, I want to cancel an ongoing song generation.",
+      "acceptanceCriteria": [
+        "Show cancel button during generation",
+        "Clicking cancels LLM request if possible",
+        "Stop pending Spotify searches",
+        "Keep any songs already found",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 50,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-051",
+      "title": "Add playlist name auto-suggestion",
+      "description": "As a user, I want the LLM to suggest a playlist name based on my first prompt.",
+      "acceptanceCriteria": [
+        "After first generation, call /api/generate/suggest-name",
+        "Show suggested name as placeholder in name input",
+        "User can accept by leaving as-is or override by typing",
+        "Only suggest once per session",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 51,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-052",
+      "title": "Add active playlist indicator in header",
+      "description": "As a user, I want to see which playlist I'm editing.",
+      "acceptanceCriteria": [
+        "Show 'Active playlist: [Name]' label when playlist is loaded or created",
+        "Label appears in header/top of layout",
+        "Clicking label could open playlist in Spotify (optional)",
+        "Label disappears on 'New Playlist'",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 52,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-053",
+      "title": "Add duplicate song detection and warning",
+      "description": "As a user, I want to be warned if I'm adding a song that's already in my playlist.",
+      "acceptanceCriteria": [
+        "Check for duplicate when adding songs to playlist",
+        "Allow adding but show warning message",
+        "Visually flag duplicate songs in playlist view",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 53,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-054",
+      "title": "Add large playlist warning",
+      "description": "As a user, I want to be warned when my playlist is getting large.",
+      "acceptanceCriteria": [
+        "Show warning when playlist exceeds 500 songs",
+        "Display current song count in right panel header",
+        "Show Spotify limit (10,000) in warning if approaching",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 54,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-055",
+      "title": "Add error handling and retry UI",
+      "description": "As a user, I want clear error messages with retry options when things fail.",
+      "acceptanceCriteria": [
+        "Show error toast/banner on API failures",
+        "Include 'Retry' button for recoverable errors",
+        "Show specific message for auth errors (re-login needed)",
+        "Show specific message for rate limiting (wait and retry)",
+        "Show specific message for LLM errors",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 55,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-056",
+      "title": "Add Spotify login button and auth status",
+      "description": "As a user, I want to see my login status and be able to log in/out.",
+      "acceptanceCriteria": [
+        "Create src/components/features/auth/SpotifyLoginButton.tsx",
+        "Create src/components/features/auth/AuthStatus.tsx",
+        "Show 'Connect with Spotify' button when not authenticated",
+        "Show user profile/name and 'Logout' when authenticated",
+        "Login button redirects to /api/auth/spotify",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 56,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-057",
+      "title": "Add rate limiting to API routes",
+      "description": "As a developer, I need rate limiting on API routes to prevent abuse.",
+      "acceptanceCriteria": [
+        "Add rate limiting middleware or helper",
+        "Limit /api/generate to 10 requests per minute per session",
+        "Limit all API routes to 100 requests per minute per IP",
+        "Return 429 status with Retry-After header when limited",
+        "Create tests for rate limiting logic",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 57,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-058",
+      "title": "Add prompt sanitization for LLM security",
+      "description": "As a developer, I need to sanitize user prompts to prevent injection attacks.",
+      "acceptanceCriteria": [
+        "Create sanitizePrompt() utility function in src/lib/llm/sanitize.ts",
+        "Strip system override attempts from user input",
+        "Ensure user input is clearly separated from system prompt",
+        "Log suspicious inputs for monitoring",
+        "Create src/lib/llm/sanitize.test.ts with tests for injection patterns",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 58,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-059",
+      "title": "Add CSRF protection to write endpoints",
+      "description": "As a developer, I need CSRF protection on playlist create/update endpoints.",
+      "acceptanceCriteria": [
+        "Generate CSRF token on auth",
+        "Include token in requests to /api/spotify/playlist",
+        "Validate token on server side",
+        "Return 403 on invalid token",
+        "Typecheck passes"
+      ],
+      "priority": 59,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-060",
+      "title": "Configure CSP headers and security settings",
+      "description": "As a developer, I need proper security headers configured.",
+      "acceptanceCriteria": [
+        "Add Content-Security-Policy header in next.config.js",
+        "Restrict script sources to self",
+        "Enable Trusted Types",
+        "Add X-Frame-Options: DENY",
+        "Add X-Content-Type-Options: nosniff",
+        "Typecheck passes"
+      ],
+      "priority": 60,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-061",
+      "title": "Wire up main page with all components",
+      "description": "As a user, I want the complete app experience on the main page.",
+      "acceptanceCriteria": [
+        "Update src/app/page.tsx with ThreePanelLayout",
+        "Include auth status in header",
+        "Connect all stores to components",
+        "Initialize auth on page load",
+        "Show login prompt if not authenticated",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 61,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-062",
+      "title": "Add search results caching",
+      "description": "As a developer, I need to cache Spotify search results to reduce API calls.",
+      "acceptanceCriteria": [
+        "Create search cache in candidateStore or separate cache",
+        "Cache key: normalized title + artist",
+        "Return cached result if available",
+        "Invalidate cache on session clear",
+        "Create tests for cache hit/miss/invalidation behavior",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 62,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-063",
+      "title": "Add exponential backoff for Spotify rate limiting",
+      "description": "As a developer, I need proper handling of Spotify 429 responses.",
+      "acceptanceCriteria": [
+        "Detect 429 response from Spotify API",
+        "Extract Retry-After header",
+        "Implement exponential backoff for retries",
+        "Max 3 retries before failing",
+        "Create tests for backoff logic with mocked timers",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 63,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
