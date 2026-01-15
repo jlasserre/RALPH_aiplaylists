@@ -14,8 +14,8 @@ interface LeftPanelProps {
   onSuggestSongs?: (prompt: string, provider: LLMProvider) => void;
   /** Callback when playlist name changes */
   onPlaylistNameChange?: (name: string) => void;
-  /** Initial playlist name */
-  initialPlaylistName?: string;
+  /** Controlled playlist name value */
+  playlistName?: string;
   /** Whether generation is in progress */
   isGenerating?: boolean;
 }
@@ -36,16 +36,18 @@ export function LeftPanel({
   onLoadExisting,
   onSuggestSongs,
   onPlaylistNameChange,
-  initialPlaylistName = '',
+  playlistName = '',
   isGenerating = false,
 }: LeftPanelProps) {
-  const [playlistName, setPlaylistName] = useState(initialPlaylistName);
   const [prompt, setPrompt] = useState('');
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('claude');
 
-  const handlePlaylistNameChange = (value: string) => {
-    setPlaylistName(value);
-    onPlaylistNameChange?.(value);
+  /**
+   * Handle New Playlist click - clears prompt and calls parent handler
+   */
+  const handleNewPlaylist = () => {
+    setPrompt('');
+    onNewPlaylist?.();
   };
 
   const handleSuggestSongs = () => {
@@ -68,7 +70,7 @@ export function LeftPanel({
           variant="primary"
           size="sm"
           className="w-full"
-          onClick={onNewPlaylist}
+          onClick={handleNewPlaylist}
         >
           New Playlist
         </Button>
@@ -150,7 +152,7 @@ export function LeftPanel({
         label="Playlist Name"
         placeholder="Enter playlist name..."
         value={playlistName}
-        onChange={(e) => handlePlaylistNameChange(e.target.value)}
+        onChange={(e) => onPlaylistNameChange?.(e.target.value)}
         maxLength={100}
       />
 
