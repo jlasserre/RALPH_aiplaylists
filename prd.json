@@ -251,8 +251,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created SongCard component with state icons (synced, pending, markedForRemoval), tooltips on hover, and click handler support. Updated PlaylistView to use SongCard. Added demo data to page.tsx. Verified in browser with dev-browser skill."
     },
     {
       "id": "US-015",

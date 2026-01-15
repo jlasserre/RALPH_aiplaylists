@@ -204,3 +204,18 @@
   - Skeleton loaders in RightPanel match MiddlePanel pattern with 6 placeholder cards
   - The eslint.config.mjs needed CommonJS files (jest.config.js, jest.setup.js) in globalIgnores to avoid @typescript-eslint/no-require-imports error
 ---
+
+## 2026-01-15 - US-014
+- What was implemented: SongCard component with state icons and tooltips
+- Files changed:
+  - src/components/features/playlist/SongCard.tsx - reusable song card with state icons (synced, pending, markedForRemoval), tooltips, and click handler
+  - src/components/features/playlist/PlaylistView.tsx - updated to use SongCard component instead of inline rendering
+  - src/components/features/playlist/index.ts - added SongCard export
+  - src/app/page.tsx - added demo data for development testing (demoPlaylistSongs, demoCandidateSongs)
+- **Learnings for future iterations:**
+  - Extract reusable components (like SongCard) when rendering patterns are duplicated across components
+  - State icons with tooltips can use CSS group/group-hover pattern for hover effects
+  - The SongCard component supports both playlist (with state icons) and candidate (without state icons) use cases via props
+  - Demo data in page.tsx is useful for visual testing during development before stores are wired up
+  - Separate icon components (SyncedIcon, PendingIcon, MarkedForRemovalIcon) improve readability and maintainability
+---
