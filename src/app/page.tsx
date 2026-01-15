@@ -6,7 +6,7 @@ import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useAuthStore } from '@/store/authStore';
-import type { UserPlaylist, SpotifyTrack, Song } from '@/types';
+import type { UserPlaylist, SpotifyTrack, Song, LLMProvider } from '@/types';
 
 export default function Home() {
   // Auth state
@@ -35,6 +35,8 @@ export default function Home() {
   const isLoadingCandidates = useCandidateStore((state) => state.isLoading);
   const toggleSelection = useCandidateStore((state) => state.toggleSelection);
   const clearCandidates = useCandidateStore((state) => state.clearCandidates);
+  const setCandidates = useCandidateStore((state) => state.setCandidates);
+  const setLoadingCandidates = useCandidateStore((state) => state.setLoading);
 
   // User playlists state
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
@@ -164,6 +166,81 @@ export default function Home() {
     addSelectedToPlaylist();
   };
 
+  /**
+   * Handle song generation flow:
+   * 1. Call /api/generate to get song suggestions from LLM
+   * 2. Call /api/spotify/search to find tracks on Spotify
+   * 3. Display candidates in the middle panel
+   */
+  const handleSuggestSongs = useCallback(
+    async (prompt: string, provider: LLMProvider) => {
+      if (!accessToken) {
+        console.error('Not authenticated');
+        return;
+      }
+
+      // Set loading state
+      setLoadingCandidates(true);
+
+      try {
+        // Step 1: Generate songs from LLM
+        const generateResponse = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt, provider }),
+        });
+
+        if (!generateResponse.ok) {
+          const errorData = await generateResponse.json().catch(() => ({}));
+          console.error('Failed to generate songs:', errorData.message || generateResponse.status);
+          setLoadingCandidates(false);
+          return;
+        }
+
+        const generateData = await generateResponse.json();
+        const songs: Song[] = generateData.songs || [];
+
+        if (songs.length === 0) {
+          console.warn('No songs generated');
+          setCandidates([]);
+          return;
+        }
+
+        // Step 2: Search for songs on Spotify
+        const searchResponse = await fetch('/api/spotify/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            songs,
+            accessToken,
+          }),
+        });
+
+        if (!searchResponse.ok) {
+          const errorData = await searchResponse.json().catch(() => ({}));
+          console.error('Failed to search Spotify:', errorData.message || searchResponse.status);
+          setLoadingCandidates(false);
+          return;
+        }
+
+        const searchData = await searchResponse.json();
+        const results: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }> =
+          searchData.results || [];
+
+        // Step 3: Set candidates in the store
+        setCandidates(results);
+      } catch (error) {
+        console.error('Error during song generation:', error);
+        setLoadingCandidates(false);
+      }
+    },
+    [accessToken, setLoadingCandidates, setCandidates]
+  );
+
   // Determine if we have an existing Spotify playlist loaded
   const hasSpotifyPlaylist = spotifyPlaylistId !== null;
 
@@ -186,8 +263,10 @@ export default function Home() {
         <LeftPanel
           onNewPlaylist={clearPlaylist}
           onLoadExisting={handleLoadExisting}
+          onSuggestSongs={handleSuggestSongs}
           onPlaylistNameChange={setName}
           playlistName={playlistName}
+          isGenerating={isLoadingCandidates}
           userPlaylists={userPlaylists}
           isLoadingPlaylists={isLoadingPlaylists}
         />
