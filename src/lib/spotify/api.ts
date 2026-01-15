@@ -3,6 +3,18 @@
  * Handles track search, playlist management, and recommendations
  */
 
+import type { SpotifyTrack } from '@/types';
+
+/**
+ * Spotify search response type
+ */
+interface SpotifySearchResponse {
+  tracks: {
+    items: SpotifyTrack[];
+    total: number;
+  };
+}
+
 /**
  * Custom error class for Spotify authentication errors (401)
  */
@@ -49,6 +61,108 @@ export class SpotifyAPIError extends Error {
 }
 
 const SPOTIFY_API_BASE_URL = 'https://api.spotify.com/v1';
+
+/**
+ * Normalizes a string for fuzzy matching
+ * - Converts to lowercase
+ * - Removes accents and diacritics
+ * - Removes special characters and punctuation
+ * - Collapses multiple spaces
+ * @param str - String to normalize
+ * @returns Normalized string
+ */
+export function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/[''`]/g, '') // Remove apostrophes
+    .replace(/[^\w\s]/g, ' ') // Replace special chars with space
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .trim();
+}
+
+/**
+ * Calculates Levenshtein distance between two strings
+ * @param a - First string
+ * @param b - Second string
+ * @returns Edit distance between strings
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  // Initialize first column
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+
+  // Initialize first row
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill in the rest of the matrix
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b[i - 1] === a[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Calculates similarity ratio between two strings (0 to 1)
+ * @param a - First string
+ * @param b - Second string
+ * @returns Similarity ratio (1 = identical, 0 = completely different)
+ */
+export function calculateSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length === 0 || b.length === 0) return 0;
+
+  const distance = levenshteinDistance(a, b);
+  const maxLength = Math.max(a.length, b.length);
+  return 1 - distance / maxLength;
+}
+
+/**
+ * Checks if two strings match with fuzzy tolerance
+ * @param query - Search query string
+ * @param candidate - Candidate string to match against
+ * @param threshold - Minimum similarity threshold (0-1, default 0.8)
+ * @returns True if strings match within threshold
+ */
+export function fuzzyMatch(
+  query: string,
+  candidate: string,
+  threshold: number = 0.8
+): boolean {
+  const normalizedQuery = normalizeString(query);
+  const normalizedCandidate = normalizeString(candidate);
+
+  // Exact match after normalization
+  if (normalizedQuery === normalizedCandidate) return true;
+
+  // Check if one contains the other
+  if (
+    normalizedCandidate.includes(normalizedQuery) ||
+    normalizedQuery.includes(normalizedCandidate)
+  ) {
+    return true;
+  }
+
+  // Calculate similarity and check against threshold
+  return calculateSimilarity(normalizedQuery, normalizedCandidate) >= threshold;
+}
 
 /**
  * Client for interacting with the Spotify Web API
@@ -193,5 +307,43 @@ export class SpotifyClient {
       method: 'DELETE',
       body: body ? JSON.stringify(body) : undefined,
     });
+  }
+
+  /**
+   * Searches for a track on Spotify by title and artist
+   * Uses fuzzy matching to handle slight variations in title/artist names
+   * @param title - Track title
+   * @param artist - Artist name
+   * @returns SpotifyTrack if found, null otherwise
+   */
+  async searchTrack(title: string, artist: string): Promise<SpotifyTrack | null> {
+    // Build search query using Spotify's query syntax
+    const query = `track:${title} artist:${artist}`;
+    const encodedQuery = encodeURIComponent(query);
+
+    const response = await this.get<SpotifySearchResponse>(
+      `/search?q=${encodedQuery}&type=track&limit=10`
+    );
+
+    const tracks = response.tracks?.items || [];
+
+    if (tracks.length === 0) {
+      return null;
+    }
+
+    // Find the best match using fuzzy matching
+    for (const track of tracks) {
+      const titleMatch = fuzzyMatch(title, track.name);
+      const artistMatch = track.artists.some((a) =>
+        fuzzyMatch(artist, a.name)
+      );
+
+      if (titleMatch && artistMatch) {
+        return track;
+      }
+    }
+
+    // No match found with fuzzy matching - return null
+    return null;
   }
 }

@@ -7,6 +7,10 @@ import {
   SpotifyAuthError,
   SpotifyRateLimitError,
   SpotifyAPIError,
+  normalizeString,
+  levenshteinDistance,
+  calculateSimilarity,
+  fuzzyMatch,
 } from './api';
 
 // Mock global fetch
@@ -493,5 +497,378 @@ describe('SpotifyAPIError', () => {
 
     expect(error.statusCode).toBe(500);
     expect(error.isRetryable).toBe(true);
+  });
+});
+
+describe('normalizeString', () => {
+  it('should convert to lowercase', () => {
+    expect(normalizeString('Hello World')).toBe('hello world');
+  });
+
+  it('should remove accents and diacritics', () => {
+    expect(normalizeString('café')).toBe('cafe');
+    expect(normalizeString('naïve')).toBe('naive');
+    expect(normalizeString('résumé')).toBe('resume');
+    expect(normalizeString('José González')).toBe('jose gonzalez');
+  });
+
+  it('should remove apostrophes', () => {
+    expect(normalizeString("don't")).toBe('dont');
+    expect(normalizeString("rock 'n' roll")).toBe('rock n roll');
+    expect(normalizeString("it's")).toBe('its');
+  });
+
+  it('should remove special characters', () => {
+    expect(normalizeString('Hello, World!')).toBe('hello world');
+    expect(normalizeString('test@#$%')).toBe('test');
+    expect(normalizeString('song - remix')).toBe('song remix');
+  });
+
+  it('should collapse multiple spaces', () => {
+    expect(normalizeString('hello   world')).toBe('hello world');
+    expect(normalizeString('  leading  trailing  ')).toBe('leading trailing');
+  });
+
+  it('should handle empty string', () => {
+    expect(normalizeString('')).toBe('');
+  });
+});
+
+describe('levenshteinDistance', () => {
+  it('should return 0 for identical strings', () => {
+    expect(levenshteinDistance('hello', 'hello')).toBe(0);
+  });
+
+  it('should return length of string when comparing with empty string', () => {
+    expect(levenshteinDistance('hello', '')).toBe(5);
+    expect(levenshteinDistance('', 'world')).toBe(5);
+  });
+
+  it('should return 1 for single character difference', () => {
+    expect(levenshteinDistance('cat', 'bat')).toBe(1); // substitution
+    expect(levenshteinDistance('cat', 'cats')).toBe(1); // insertion
+    expect(levenshteinDistance('cats', 'cat')).toBe(1); // deletion
+  });
+
+  it('should calculate correct distance for different strings', () => {
+    expect(levenshteinDistance('kitten', 'sitting')).toBe(3);
+    expect(levenshteinDistance('saturday', 'sunday')).toBe(3);
+  });
+});
+
+describe('calculateSimilarity', () => {
+  it('should return 1 for identical strings', () => {
+    expect(calculateSimilarity('hello', 'hello')).toBe(1);
+  });
+
+  it('should return 0 when one string is empty', () => {
+    expect(calculateSimilarity('hello', '')).toBe(0);
+    expect(calculateSimilarity('', 'world')).toBe(0);
+  });
+
+  it('should return high similarity for similar strings', () => {
+    const similarity = calculateSimilarity('hello', 'helo');
+    expect(similarity).toBeGreaterThan(0.7);
+  });
+
+  it('should return low similarity for different strings', () => {
+    const similarity = calculateSimilarity('abc', 'xyz');
+    expect(similarity).toBe(0);
+  });
+});
+
+describe('fuzzyMatch', () => {
+  it('should match identical strings', () => {
+    expect(fuzzyMatch('Bohemian Rhapsody', 'Bohemian Rhapsody')).toBe(true);
+  });
+
+  it('should match after normalization (case insensitive)', () => {
+    expect(fuzzyMatch('bohemian rhapsody', 'BOHEMIAN RHAPSODY')).toBe(true);
+  });
+
+  it('should match strings with accents removed', () => {
+    expect(fuzzyMatch('Jose Gonzalez', 'José González')).toBe(true);
+  });
+
+  it('should match strings with minor typos', () => {
+    expect(fuzzyMatch('Billie Eilish', 'Billie Eilsh')).toBe(true);
+  });
+
+  it('should match when candidate contains query', () => {
+    expect(fuzzyMatch('Dream', 'Dream On')).toBe(true);
+    expect(fuzzyMatch('Hello', 'Hello, World')).toBe(true);
+  });
+
+  it('should match when query contains candidate', () => {
+    expect(fuzzyMatch('Bohemian Rhapsody - Remastered', 'Bohemian Rhapsody')).toBe(
+      true
+    );
+  });
+
+  it('should not match completely different strings', () => {
+    expect(fuzzyMatch('Hello', 'Goodbye')).toBe(false);
+    expect(fuzzyMatch('Queen', 'Beatles')).toBe(false);
+  });
+
+  it('should respect custom threshold', () => {
+    // "hello" and "hallo" have similarity ~0.8 (1 char difference out of 5)
+    // With 0.5 threshold, they should match
+    expect(fuzzyMatch('hello', 'hallo', 0.5)).toBe(true);
+    // With 0.95 threshold, they shouldn't match
+    expect(fuzzyMatch('hello', 'hallo', 0.95)).toBe(false);
+  });
+
+  it('should match song titles with punctuation differences', () => {
+    expect(fuzzyMatch("Don't Stop Believin'", 'Dont Stop Believin')).toBe(true);
+    expect(
+      fuzzyMatch('Sweet Child O Mine', "Sweet Child O' Mine")
+    ).toBe(true);
+  });
+});
+
+describe('SpotifyClient.searchTrack', () => {
+  let client: SpotifyClient;
+
+  const mockSpotifyTrack = {
+    id: 'track123',
+    uri: 'spotify:track:track123',
+    name: 'Bohemian Rhapsody',
+    artists: [{ id: 'artist1', name: 'Queen' }],
+    album: {
+      id: 'album1',
+      name: 'A Night at the Opera',
+      images: [{ url: 'https://example.com/cover.jpg', width: 300, height: 300 }],
+    },
+    duration_ms: 354000,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    client = new SpotifyClient('test-access-token');
+  });
+
+  it('should find exact match', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [mockSpotifyTrack],
+          total: 1,
+        },
+      }),
+    });
+
+    const result = await client.searchTrack('Bohemian Rhapsody', 'Queen');
+
+    expect(result).toEqual(mockSpotifyTrack);
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/search?q='),
+      expect.any(Object)
+    );
+  });
+
+  it('should use correct query format', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [mockSpotifyTrack],
+          total: 1,
+        },
+      }),
+    });
+
+    await client.searchTrack('Bohemian Rhapsody', 'Queen');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining(
+        encodeURIComponent('track:Bohemian Rhapsody artist:Queen')
+      ),
+      expect.any(Object)
+    );
+  });
+
+  it('should return null when no tracks found', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [],
+          total: 0,
+        },
+      }),
+    });
+
+    const result = await client.searchTrack('NonExistent Song', 'Unknown Artist');
+
+    expect(result).toBeNull();
+  });
+
+  it('should handle fuzzy title matching', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [
+            {
+              ...mockSpotifyTrack,
+              name: "Don't Stop Believin'",
+              artists: [{ id: 'artist2', name: 'Journey' }],
+            },
+          ],
+          total: 1,
+        },
+      }),
+    });
+
+    // Query without apostrophes should match
+    const result = await client.searchTrack('Dont Stop Believin', 'Journey');
+
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe("Don't Stop Believin'");
+  });
+
+  it('should handle fuzzy artist matching', async () => {
+    const trackWithAccent = {
+      ...mockSpotifyTrack,
+      name: 'Heartbeats',
+      artists: [{ id: 'artist3', name: 'José González' }],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [trackWithAccent],
+          total: 1,
+        },
+      }),
+    });
+
+    // Query without accents should match
+    const result = await client.searchTrack('Heartbeats', 'Jose Gonzalez');
+
+    expect(result).not.toBeNull();
+    expect(result?.artists[0].name).toBe('José González');
+  });
+
+  it('should match any artist in multi-artist track', async () => {
+    const multiArtistTrack = {
+      ...mockSpotifyTrack,
+      name: 'Under Pressure',
+      artists: [
+        { id: 'artist1', name: 'Queen' },
+        { id: 'artist4', name: 'David Bowie' },
+      ],
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [multiArtistTrack],
+          total: 1,
+        },
+      }),
+    });
+
+    // Should match with second artist
+    const result = await client.searchTrack('Under Pressure', 'David Bowie');
+
+    expect(result).not.toBeNull();
+    expect(result?.name).toBe('Under Pressure');
+  });
+
+  it('should return null when no fuzzy match found', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [mockSpotifyTrack], // Bohemian Rhapsody by Queen
+          total: 1,
+        },
+      }),
+    });
+
+    // Completely different song/artist
+    const result = await client.searchTrack('Hello', 'Adele');
+
+    expect(result).toBeNull();
+  });
+
+  it('should find first matching track from multiple results', async () => {
+    const secondTrack = {
+      ...mockSpotifyTrack,
+      id: 'track456',
+      name: 'We Will Rock You',
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [secondTrack, mockSpotifyTrack],
+          total: 2,
+        },
+      }),
+    });
+
+    const result = await client.searchTrack('Bohemian Rhapsody', 'Queen');
+
+    // Should find the second track (Bohemian Rhapsody)
+    expect(result?.id).toBe('track123');
+    expect(result?.name).toBe('Bohemian Rhapsody');
+  });
+
+  it('should handle case insensitive matching', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: {
+          items: [mockSpotifyTrack],
+          total: 1,
+        },
+      }),
+    });
+
+    const result = await client.searchTrack('BOHEMIAN RHAPSODY', 'QUEEN');
+
+    expect(result).not.toBeNull();
+  });
+
+  it('should propagate API errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Unauthorized' } }),
+    });
+
+    await expect(
+      client.searchTrack('Test Song', 'Test Artist')
+    ).rejects.toThrow(SpotifyAuthError);
+  });
+
+  it('should handle empty tracks object in response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tracks: null,
+      }),
+    });
+
+    const result = await client.searchTrack('Test Song', 'Test Artist');
+
+    expect(result).toBeNull();
   });
 });
