@@ -261,3 +261,15 @@
   - Mock OpenAI.APIError in tests same way as Anthropic - create object with `status` property and set prototype
   - Both clients follow same pattern: custom error class with statusCode/isRetryable, parseSongsResponse, isValidSong, handleError
 ---
+
+## 2026-01-15 - US-018
+- What was implemented: LLM factory with provider selection
+- Files changed:
+  - src/lib/llm/index.ts - LLM factory module with getLLMClient(), getDefaultProvider(), LLMClient interface, LLMProvider type, and re-exports
+  - src/lib/llm/index.test.ts - 23 tests covering factory selection, client interface, default provider, and module exports
+- **Learnings for future iterations:**
+  - When re-exporting types with isolatedModules enabled, use `export type { X }` syntax for types and `export { Y }` for values
+  - Mock both @anthropic-ai/sdk and openai SDKs in factory tests to avoid API key validation errors in constructors
+  - LLMClient interface provides unified API across providers: generateSongs() and generatePlaylistName()
+  - getDefaultProvider() reads from LLM_DEFAULT_PROVIDER env var, defaults to 'claude' if not set or invalid
+---
