@@ -1,14 +1,42 @@
+import { ThreePanelLayout } from '@/components/layout';
+
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-col items-center justify-center gap-6 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-black dark:text-zinc-50">
-          AI Playlist Generator
-        </h1>
-        <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
-          Generate Spotify playlists using AI
-        </p>
-      </main>
-    </div>
+    <ThreePanelLayout
+      header={
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">
+            AI Playlist Generator
+          </h1>
+          <div className="text-sm text-gray-500">
+            {/* Auth status will go here */}
+          </div>
+        </div>
+      }
+      leftPanel={
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">Controls</h2>
+          <p className="text-sm text-gray-500">
+            Playlist controls will appear here.
+          </p>
+        </div>
+      }
+      middlePanel={
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">Candidates</h2>
+          <p className="text-sm text-gray-500">
+            Song suggestions will appear here.
+          </p>
+        </div>
+      }
+      rightPanel={
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">Your Playlist</h2>
+          <p className="text-sm text-gray-500">
+            Your playlist songs will appear here.
+          </p>
+        </div>
+      }
+    />
   );
 }
