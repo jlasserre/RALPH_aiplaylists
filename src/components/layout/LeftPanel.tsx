@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Input, TextArea } from '@/components/ui';
+import type { UserPlaylist } from '@/types';
 
 type LLMProvider = 'claude' | 'openai';
 
@@ -18,6 +19,10 @@ interface LeftPanelProps {
   playlistName?: string;
   /** Whether generation is in progress */
   isGenerating?: boolean;
+  /** User's Spotify playlists for "Load Existing" dropdown */
+  userPlaylists?: UserPlaylist[];
+  /** Whether playlists are being loaded */
+  isLoadingPlaylists?: boolean;
 }
 
 const PROMPT_MIN_LENGTH = 10;
@@ -38,6 +43,8 @@ export function LeftPanel({
   onPlaylistNameChange,
   playlistName = '',
   isGenerating = false,
+  userPlaylists = [],
+  isLoadingPlaylists = false,
 }: LeftPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('claude');
@@ -76,7 +83,7 @@ export function LeftPanel({
         </Button>
         <div className="relative">
           <select
-            className="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-500"
             onChange={(e) => {
               if (e.target.value) {
                 onLoadExisting?.(e.target.value);
@@ -84,11 +91,16 @@ export function LeftPanel({
               }
             }}
             defaultValue=""
+            disabled={isLoadingPlaylists}
           >
             <option value="" disabled>
-              Load Existing...
+              {isLoadingPlaylists ? 'Loading playlists...' : 'Load Existing...'}
             </option>
-            {/* Playlist options will be populated by parent component */}
+            {userPlaylists.map((playlist) => (
+              <option key={playlist.id} value={playlist.id}>
+                {playlist.isOwned ? '' : '🔒 '}{playlist.name} ({playlist.tracks.total} tracks)
+              </option>
+            ))}
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
             <svg

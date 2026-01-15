@@ -1,10 +1,18 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { ThreePanelLayout, LeftPanel, MiddlePanel, RightPanel } from '@/components/layout';
 import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
+import { usePlaylistStore } from '@/store/playlistStore';
+import { useAuthStore } from '@/store/authStore';
+import type { UserPlaylist, SpotifyTrack, Song } from '@/types';
 
 export default function Home() {
+  // Auth state
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   // Playlist state and actions
   const {
     name: playlistName,
@@ -18,10 +26,120 @@ export default function Home() {
     clearPlaylist,
   } = usePlaylist();
 
+  // Direct access to playlistStore actions for loading playlists
+  const setPlaylistId = usePlaylistStore((state) => state.setPlaylistId);
+  const loadSongs = usePlaylistStore((state) => state.loadSongs);
+
   // Candidate state and actions
   const candidates = useCandidateStore((state) => state.candidates);
   const isLoadingCandidates = useCandidateStore((state) => state.isLoading);
   const toggleSelection = useCandidateStore((state) => state.toggleSelection);
+  const clearCandidates = useCandidateStore((state) => state.clearCandidates);
+
+  // User playlists state
+  const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
+  const [isLoadingPlaylistTracks, setIsLoadingPlaylistTracks] = useState(false);
+
+  /**
+   * Fetch user's playlists when authenticated
+   */
+  const fetchUserPlaylists = useCallback(async () => {
+    if (!accessToken) return;
+
+    setIsLoadingPlaylists(true);
+    try {
+      const response = await fetch(
+        `/api/spotify/playlists?accessToken=${encodeURIComponent(accessToken)}`
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch playlists:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      setUserPlaylists(data.playlists || []);
+    } catch (error) {
+      console.error('Error fetching playlists:', error);
+    } finally {
+      setIsLoadingPlaylists(false);
+    }
+  }, [accessToken]);
+
+  /**
+   * Fetch playlists when authenticated
+   */
+  useEffect(() => {
+    if (isAuthenticated && accessToken) {
+      fetchUserPlaylists();
+    } else {
+      setUserPlaylists([]);
+    }
+  }, [isAuthenticated, accessToken, fetchUserPlaylists]);
+
+  /**
+   * Handle loading an existing playlist
+   * Fetches tracks from Spotify and populates the store
+   */
+  const handleLoadExisting = useCallback(
+    async (playlistId: string) => {
+      if (!accessToken) return;
+
+      // Find the selected playlist to get its metadata
+      const selectedPlaylist = userPlaylists.find((p) => p.id === playlistId);
+      if (!selectedPlaylist) return;
+
+      setIsLoadingPlaylistTracks(true);
+      clearCandidates();
+
+      try {
+        const response = await fetch(
+          `/api/spotify/playlists/${playlistId}/tracks?accessToken=${encodeURIComponent(accessToken)}`
+        );
+
+        if (!response.ok) {
+          console.error('Failed to fetch playlist tracks:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+        const spotifyTracks: SpotifyTrack[] = data.tracks || [];
+
+        // Convert SpotifyTracks to the format expected by loadSongs
+        const songsToLoad = spotifyTracks.map((track) => ({
+          song: {
+            title: track.name,
+            artist: track.artists.map((a) => a.name).join(', '),
+            album: track.album.name,
+          } as Song,
+          spotifyTrack: track,
+        }));
+
+        // Load songs into the store
+        loadSongs(songsToLoad, selectedPlaylist.isOwned);
+
+        // Set the playlist metadata
+        setName(selectedPlaylist.name);
+
+        // Only set the Spotify playlist ID if we own it (can update it)
+        // For followed playlists, we don't store the ID since we'll create a new one
+        if (selectedPlaylist.isOwned) {
+          setPlaylistId(playlistId);
+        } else {
+          // Clear playlist ID for read-only playlists - user will create a new one
+          setPlaylistId(null);
+          // Clear the name so user can enter a new name for the new playlist
+          setName('');
+        }
+      } catch (error) {
+        console.error('Error loading playlist tracks:', error);
+      } finally {
+        setIsLoadingPlaylistTracks(false);
+      }
+    },
+    [accessToken, userPlaylists, loadSongs, setName, setPlaylistId, clearCandidates]
+  );
 
   /**
    * Handle clicking on a song in the playlist.
@@ -67,8 +185,11 @@ export default function Home() {
       leftPanel={
         <LeftPanel
           onNewPlaylist={clearPlaylist}
+          onLoadExisting={handleLoadExisting}
           onPlaylistNameChange={setName}
           playlistName={playlistName}
+          userPlaylists={userPlaylists}
+          isLoadingPlaylists={isLoadingPlaylists}
         />
       }
       middlePanel={
@@ -85,6 +206,7 @@ export default function Home() {
           onSongClick={handleSongClick}
           hasSpotifyPlaylist={hasSpotifyPlaylist}
           isReadOnly={isReadOnly}
+          isLoading={isLoadingPlaylistTracks}
         />
       }
     />
