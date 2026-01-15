@@ -6,7 +6,7 @@ import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useAuthStore } from '@/store/authStore';
-import type { UserPlaylist, SpotifyTrack, Song, LLMProvider } from '@/types';
+import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
 
 export default function Home() {
   // Auth state
@@ -26,9 +26,11 @@ export default function Home() {
     clearPlaylist,
   } = usePlaylist();
 
-  // Direct access to playlistStore actions for loading playlists
+  // Direct access to playlistStore actions for loading playlists and syncing
   const setPlaylistId = usePlaylistStore((state) => state.setPlaylistId);
   const loadSongs = usePlaylistStore((state) => state.loadSongs);
+  const markPendingAsSynced = usePlaylistStore((state) => state.markPendingAsSynced);
+  const setIsOwned = usePlaylistStore((state) => state.setIsOwned);
 
   // Candidate state and actions
   const candidates = useCandidateStore((state) => state.candidates);
@@ -42,6 +44,13 @@ export default function Home() {
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
   const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
   const [isLoadingPlaylistTracks, setIsLoadingPlaylistTracks] = useState(false);
+
+  // Save/create playlist state
+  const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<{
+    message: string;
+    playlistUrl: string;
+  } | null>(null);
 
   /**
    * Fetch user's playlists when authenticated
@@ -241,6 +250,121 @@ export default function Home() {
     [accessToken, setLoadingCandidates, setCandidates]
   );
 
+  /**
+   * Handle creating a new playlist on Spotify
+   * Called when user clicks "Create Playlist" button
+   */
+  const handleCreatePlaylist = useCallback(async () => {
+    if (!accessToken) {
+      console.error('Not authenticated');
+      return;
+    }
+
+    // Get songs that need to be added (pending songs)
+    const pendingSongs = songs.filter((s) => s.state === 'pending');
+
+    if (pendingSongs.length === 0) {
+      console.warn('No pending songs to add');
+      return;
+    }
+
+    // Use a default name if none provided
+    const finalName = playlistName.trim() || 'My AI Playlist';
+
+    // Get track URIs for all pending songs
+    const trackUris = pendingSongs
+      .map((s) => s.spotifyTrack?.uri)
+      .filter((uri): uri is string => !!uri);
+
+    if (trackUris.length === 0) {
+      console.error('No valid track URIs found');
+      return;
+    }
+
+    setIsSaving(true);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch('/api/spotify/playlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: finalName,
+          trackUris,
+          accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to create playlist:', errorData.message || response.status);
+        return;
+      }
+
+      const data: PlaylistCreateResponse = await response.json();
+
+      // Update the store with the new playlist ID
+      setPlaylistId(data.playlistId);
+
+      // If we had a name placeholder, set the actual name used
+      if (!playlistName.trim()) {
+        setName(finalName);
+      }
+
+      // Mark all pending songs as synced
+      markPendingAsSynced();
+
+      // Set the playlist as owned (since we just created it)
+      setIsOwned(true);
+
+      // Show success message with link to playlist
+      setSuccessMessage({
+        message: 'Playlist created successfully!',
+        playlistUrl: data.playlistUrl,
+      });
+
+      // Refresh the user's playlists so the new one appears in the dropdown
+      fetchUserPlaylists();
+    } catch (error) {
+      console.error('Error creating playlist:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    accessToken,
+    songs,
+    playlistName,
+    setPlaylistId,
+    setName,
+    markPendingAsSynced,
+    setIsOwned,
+    fetchUserPlaylists,
+  ]);
+
+  /**
+   * Handle save action (create or update playlist)
+   * For US-037, this only handles create. US-038 will add update logic.
+   */
+  const handleSave = useCallback(() => {
+    // If we have an existing Spotify playlist that we own, update it (US-038)
+    // Otherwise, create a new playlist
+    if (spotifyPlaylistId && isOwned) {
+      // TODO: US-038 will implement handleUpdatePlaylist
+      console.log('Update playlist flow - will be implemented in US-038');
+    } else {
+      handleCreatePlaylist();
+    }
+  }, [spotifyPlaylistId, isOwned, handleCreatePlaylist]);
+
+  /**
+   * Clear success message
+   */
+  const dismissSuccessMessage = useCallback(() => {
+    setSuccessMessage(null);
+  }, []);
+
   // Determine if we have an existing Spotify playlist loaded
   const hasSpotifyPlaylist = spotifyPlaylistId !== null;
 
@@ -250,13 +374,64 @@ export default function Home() {
   return (
     <ThreePanelLayout
       header={
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">
-            AI Playlist Generator
-          </h1>
-          <div className="text-sm text-gray-500">
-            {/* Auth status will go here */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900">
+              AI Playlist Generator
+            </h1>
+            <div className="text-sm text-gray-500">
+              {/* Auth status will go here */}
+            </div>
           </div>
+
+          {/* Success message banner */}
+          {successMessage && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span>{successMessage.message}</span>
+                <a
+                  href={successMessage.playlistUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 underline hover:text-green-900 font-medium"
+                >
+                  Open in Spotify
+                </a>
+              </div>
+              <button
+                onClick={dismissSuccessMessage}
+                className="text-green-600 hover:text-green-800"
+                aria-label="Dismiss"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       }
       leftPanel={
@@ -283,7 +458,9 @@ export default function Home() {
         <RightPanel
           songs={songs}
           onSongClick={handleSongClick}
+          onSave={handleSave}
           hasSpotifyPlaylist={hasSpotifyPlaylist}
+          isSaving={isSaving}
           isReadOnly={isReadOnly}
           isLoading={isLoadingPlaylistTracks}
         />
