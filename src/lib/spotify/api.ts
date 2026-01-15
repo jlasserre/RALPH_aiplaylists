@@ -44,6 +44,29 @@ interface SpotifyPlaylistsResponse {
 }
 
 /**
+ * Spotify playlist track item from /playlists/{id}/tracks response
+ */
+interface SpotifyPlaylistTrackItem {
+  track: SpotifyTrack | null;
+  added_at: string | null;
+  added_by: {
+    id: string;
+  } | null;
+}
+
+/**
+ * Spotify playlist tracks response type (paginated)
+ */
+interface SpotifyPlaylistTracksResponse {
+  items: SpotifyPlaylistTrackItem[];
+  total: number;
+  next: string | null;
+  previous: string | null;
+  offset: number;
+  limit: number;
+}
+
+/**
  * Custom error class for Spotify authentication errors (401)
  */
 export class SpotifyAuthError extends Error {
@@ -522,5 +545,49 @@ export class SpotifyClient {
     }
 
     return playlists;
+  }
+
+  /**
+   * Gets tracks from a playlist
+   * Fetches from /v1/playlists/{id}/tracks endpoint with pagination support
+   * @param playlistId - Spotify playlist ID
+   * @param limit - Maximum tracks to fetch (default 100, will paginate if more are needed)
+   * @returns Array of SpotifyTrack objects (excludes null/deleted tracks)
+   */
+  async getPlaylistTracks(
+    playlistId: string,
+    limit: number = 100
+  ): Promise<SpotifyTrack[]> {
+    // Clamp limit to valid range (minimum 1)
+    const maxToFetch = Math.max(1, limit);
+
+    // Spotify allows max 100 per request
+    const pageSize = Math.min(maxToFetch, 100);
+    const tracks: SpotifyTrack[] = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore && tracks.length < maxToFetch) {
+      const response = await this.get<SpotifyPlaylistTracksResponse>(
+        `/playlists/${playlistId}/tracks?limit=${pageSize}&offset=${offset}`
+      );
+
+      const items = response.items || [];
+
+      for (const item of items) {
+        if (tracks.length >= maxToFetch) break;
+
+        // Skip null tracks (deleted/unavailable tracks)
+        if (item.track) {
+          tracks.push(item.track);
+        }
+      }
+
+      // Check if there are more pages
+      hasMore = response.next !== null && items.length === pageSize;
+      offset += pageSize;
+    }
+
+    return tracks;
   }
 }

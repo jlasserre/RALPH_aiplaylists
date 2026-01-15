@@ -1632,3 +1632,367 @@ describe('SpotifyClient.getUserPlaylists', () => {
     expect(result[3].isOwned).toBe(false);
   });
 });
+
+describe('SpotifyClient.getPlaylistTracks', () => {
+  let client: SpotifyClient;
+
+  const createMockTrack = (id: string, name: string, artistName: string) => ({
+    id,
+    uri: `spotify:track:${id}`,
+    name,
+    artists: [{ id: `artist_${id}`, name: artistName }],
+    album: {
+      id: `album_${id}`,
+      name: `Album for ${name}`,
+      images: [{ url: `https://example.com/${id}.jpg`, width: 300, height: 300 }],
+    },
+    duration_ms: 200000,
+  });
+
+  const createMockPlaylistTrackItem = (track: ReturnType<typeof createMockTrack> | null) => ({
+    track,
+    added_at: '2024-01-15T10:00:00Z',
+    added_by: { id: 'user123' },
+  });
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    client = new SpotifyClient('test-access-token');
+  });
+
+  it('should fetch tracks from a playlist', async () => {
+    const mockTracks = [
+      createMockTrack('track1', 'Song One', 'Artist One'),
+      createMockTrack('track2', 'Song Two', 'Artist Two'),
+    ];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: mockTracks.map((t) => createMockPlaylistTrackItem(t)),
+        total: 2,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123');
+
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe('Song One');
+    expect(result[1].name).toBe('Song Two');
+  });
+
+  it('should call correct endpoint with default limit', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    await client.getPlaylistTracks('playlist123');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=100&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should respect custom limit', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    await client.getPlaylistTracks('playlist123', 50);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=50&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to maximum of 100', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    await client.getPlaylistTracks('playlist123', 200);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=100&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to minimum of 1', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 1,
+      }),
+    });
+
+    await client.getPlaylistTracks('playlist123', 0);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=1&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should handle pagination to fetch more tracks', async () => {
+    // Create 100 tracks for first page
+    const firstPageTracks = Array.from({ length: 100 }, (_, i) =>
+      createMockTrack(`track${i + 1}`, `Song ${i + 1}`, `Artist ${i + 1}`)
+    );
+
+    // First page - 100 tracks
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: firstPageTracks.map((t) => createMockPlaylistTrackItem(t)),
+        total: 150,
+        next: 'https://api.spotify.com/v1/playlists/playlist123/tracks?offset=100&limit=100',
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    // Create 50 tracks for second page
+    const secondPageTracks = Array.from({ length: 50 }, (_, i) =>
+      createMockTrack(`track${i + 101}`, `Song ${i + 101}`, `Artist ${i + 101}`)
+    );
+
+    // Second page - remaining 50 tracks
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: secondPageTracks.map((t) => createMockPlaylistTrackItem(t)),
+        total: 150,
+        next: null,
+        previous: 'https://api.spotify.com/v1/playlists/playlist123/tracks?offset=0&limit=100',
+        offset: 100,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123', 150);
+
+    expect(result).toHaveLength(150);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=100&offset=0',
+      expect.any(Object)
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=100&offset=100',
+      expect.any(Object)
+    );
+  });
+
+  it('should stop paginating when limit is reached', async () => {
+    const tracks = Array.from({ length: 5 }, (_, i) =>
+      createMockTrack(`track${i + 1}`, `Song ${i + 1}`, `Artist ${i + 1}`)
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: tracks.map((t) => createMockPlaylistTrackItem(t)),
+        total: 100,
+        next: 'https://api.spotify.com/v1/playlists/playlist123/tracks?offset=5',
+        previous: null,
+        offset: 0,
+        limit: 5,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123', 3);
+
+    // Should only return 3 tracks even though 5 were in the response
+    expect(result).toHaveLength(3);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('should return empty array when playlist has no tracks', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should handle null items in response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: null,
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should skip null tracks (deleted/unavailable tracks)', async () => {
+    const mockTrack = createMockTrack('track1', 'Available Song', 'Artist One');
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [
+          createMockPlaylistTrackItem(mockTrack),
+          createMockPlaylistTrackItem(null), // Deleted track
+          createMockPlaylistTrackItem(mockTrack),
+        ],
+        total: 3,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123');
+
+    // Should only return 2 tracks, skipping the null one
+    expect(result).toHaveLength(2);
+  });
+
+  it('should propagate authentication errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Unauthorized' } }),
+    });
+
+    await expect(client.getPlaylistTracks('playlist123')).rejects.toThrow(
+      SpotifyAuthError
+    );
+  });
+
+  it('should propagate rate limit errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': '30' }),
+      json: async () => ({ error: { message: 'Rate limit exceeded' } }),
+    });
+
+    await expect(client.getPlaylistTracks('playlist123')).rejects.toThrow(
+      SpotifyRateLimitError
+    );
+  });
+
+  it('should propagate API errors for non-existent playlists', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Not found' } }),
+    });
+
+    await expect(
+      client.getPlaylistTracks('non-existent-playlist')
+    ).rejects.toThrow(SpotifyAPIError);
+  });
+
+  it('should propagate server errors', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Internal server error' } }),
+    });
+
+    await expect(client.getPlaylistTracks('playlist123')).rejects.toThrow(
+      SpotifyAPIError
+    );
+  });
+
+  it('should return all track properties correctly', async () => {
+    const mockTrack = createMockTrack('abc123', 'Test Song', 'Test Artist');
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [createMockPlaylistTrackItem(mockTrack)],
+        total: 1,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 100,
+      }),
+    });
+
+    const result = await client.getPlaylistTracks('playlist123');
+
+    expect(result[0]).toEqual(mockTrack);
+    expect(result[0].id).toBe('abc123');
+    expect(result[0].uri).toBe('spotify:track:abc123');
+    expect(result[0].name).toBe('Test Song');
+    expect(result[0].artists[0].name).toBe('Test Artist');
+    expect(result[0].album.name).toBe('Album for Test Song');
+  });
+});
