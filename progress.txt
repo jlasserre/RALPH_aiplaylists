@@ -247,3 +247,17 @@
   - LLM may return markdown code blocks despite instructions - always strip ```json...``` from responses
   - Validate Song objects by checking title/artist are non-empty strings; filter out invalid songs from response
 ---
+
+## 2026-01-15 - US-017
+- What was implemented: OpenAI LLM client for song generation
+- Files changed:
+  - src/lib/llm/openai.ts - OpenAIClient class with generateSongs() and generatePlaylistName() methods
+  - src/lib/llm/openai.test.ts - 25 tests covering song generation, name generation, and error handling
+- **Learnings for future iterations:**
+  - OpenAI SDK uses `chat.completions.create()` with model, max_tokens, temperature, and messages params
+  - Response structure: `response.choices[0].message.content` for the text content
+  - OpenAI uses `{ role: 'system', content }` in messages array instead of separate system param like Anthropic
+  - Check for `message.content === null || message.content === undefined` instead of `!message.content` to allow empty string handling
+  - Mock OpenAI.APIError in tests same way as Anthropic - create object with `status` property and set prototype
+  - Both clients follow same pattern: custom error class with statusCode/isRetryable, parseSongsResponse, isValidSong, handleError
+---
