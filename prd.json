@@ -622,8 +622,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 36,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implementation was completed in US-028 (usePlaylist hook) and US-030 (wiring). Verified: CandidateList has checkboxes with toggleSelection, Add Selected button calls addSelectedToPlaylist which moves selected candidates to playlist with 'pending' state and clears selection. Typecheck passes. Browser verification shows UI is properly connected."
     },
     {
       "id": "US-037",

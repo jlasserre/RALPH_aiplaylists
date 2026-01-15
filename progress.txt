@@ -517,3 +517,21 @@
   - For browser testing without API keys, the flow still works but fails quickly at the LLM API call - skeleton loader shows briefly
   - LLMProvider type already exists in @/types - use it for type safety in the handler
 ---
+
+## 2026-01-15 - US-036
+- What was implemented: Verified Add Selected to playlist flow is working end-to-end
+- Files changed: None (implementation was completed in US-028 and US-030)
+- **Verification results:**
+  - CandidateList component has checkboxes with onToggleSelection callback
+  - "Add Selected (X)" button shows count and calls onAddSelected when clicked
+  - handleAddSelected in page.tsx calls addSelectedToPlaylist() from usePlaylist hook
+  - addSelectedToPlaylist() moves selected candidates to playlist store with 'pending' state
+  - deselectAll() is called after adding to clear selections in middle panel
+  - 22 tests in usePlaylist.test.ts verify all functionality including edge cases
+  - Typecheck passes
+  - Browser verification shows UI components are properly connected
+- **Learnings for future iterations:**
+  - US-036 acceptance criteria were already implemented by US-028 (usePlaylist hook with addSelectedToPlaylist) and US-030 (wiring page.tsx to stores)
+  - When a user story's functionality is already implemented by previous stories, the story becomes a verification checkpoint
+  - The usePlaylist.test.ts file provides comprehensive coverage of the add-selected flow including: adding selected candidates, clearing selections, filtering unmatched songs, handling empty selections
+---
