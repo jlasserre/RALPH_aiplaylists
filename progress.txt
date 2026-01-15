@@ -285,3 +285,14 @@
   - Map LLM 5xx errors to 502 (bad gateway) since the upstream LLM service failed
   - Include `isRetryable` in error responses so client can show retry button appropriately
 ---
+
+## 2026-01-15 - US-020
+- What was implemented: Playlist name suggestion API endpoint
+- Files changed:
+  - src/app/api/generate/suggest-name/route.ts - POST handler for playlist name suggestion with prompt/provider validation and LLM integration
+- **Learnings for future iterations:**
+  - Follow the established pattern from /api/generate/route.ts for consistent API design
+  - LLMClient interface already includes generatePlaylistName() method, so integration is straightforward
+  - Use same validation rules (10-5000 chars) for consistency across generate endpoints
+  - Error handling pattern with ClaudeAPIError and OpenAIAPIError is reusable across all LLM endpoints
+---
