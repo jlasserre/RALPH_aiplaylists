@@ -6,6 +6,8 @@ import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useAuthStore } from '@/store/authStore';
+import { NameConflictDialog } from '@/components/features/playlist';
+import type { ConflictResolution } from '@/components/features/playlist';
 import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
 
 export default function Home() {
@@ -52,6 +54,13 @@ export default function Home() {
     message: string;
     playlistUrl: string;
   } | null>(null);
+
+  // Name conflict dialog state
+  const [conflictDialog, setConflictDialog] = useState<{
+    isOpen: boolean;
+    playlistName: string;
+    playlistId: string;
+  }>({ isOpen: false, playlistName: '', playlistId: '' });
 
   /**
    * Fetch user's playlists when authenticated
@@ -252,8 +261,243 @@ export default function Home() {
   );
 
   /**
+   * Check if a playlist name already exists in user's playlists
+   * Returns the conflicting playlist if found, null otherwise
+   */
+  const findConflictingPlaylist = useCallback(
+    (name: string): UserPlaylist | null => {
+      const normalizedName = name.trim().toLowerCase();
+      return (
+        userPlaylists.find(
+          (p) => p.isOwned && p.name.trim().toLowerCase() === normalizedName
+        ) || null
+      );
+    },
+    [userPlaylists]
+  );
+
+  /**
+   * Create a new playlist on Spotify (internal function)
+   * Does the actual API call without conflict checking
+   */
+  const createPlaylistOnSpotify = useCallback(
+    async (name: string, trackUris: string[]) => {
+      const response = await fetch('/api/spotify/playlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          trackUris,
+          accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to create playlist: ${response.status}`);
+      }
+
+      return response.json() as Promise<PlaylistCreateResponse>;
+    },
+    [accessToken]
+  );
+
+  /**
+   * Add songs to an existing playlist on Spotify
+   */
+  const addSongsToExistingPlaylist = useCallback(
+    async (playlistId: string, trackUris: string[]) => {
+      const response = await fetch('/api/spotify/playlist', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlistId,
+          addUris: trackUris,
+          accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to add songs to playlist: ${response.status}`);
+      }
+
+      return response.json() as Promise<PlaylistCreateResponse>;
+    },
+    [accessToken]
+  );
+
+  /**
+   * Replace all songs in an existing playlist on Spotify
+   * First removes all tracks, then adds the new ones
+   */
+  const replacePlaylistContents = useCallback(
+    async (playlistId: string, currentTracks: string[], newTrackUris: string[]) => {
+      // First, remove all existing tracks if any
+      if (currentTracks.length > 0) {
+        const removeResponse = await fetch('/api/spotify/playlist', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            playlistId,
+            removeUris: currentTracks,
+            accessToken,
+          }),
+        });
+
+        if (!removeResponse.ok) {
+          const errorData = await removeResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || `Failed to remove tracks: ${removeResponse.status}`);
+        }
+      }
+
+      // Then add the new tracks
+      const addResponse = await fetch('/api/spotify/playlist', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playlistId,
+          addUris: newTrackUris,
+          accessToken,
+        }),
+      });
+
+      if (!addResponse.ok) {
+        const errorData = await addResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to add tracks: ${addResponse.status}`);
+      }
+
+      return addResponse.json() as Promise<PlaylistCreateResponse>;
+    },
+    [accessToken]
+  );
+
+  /**
+   * Finalize playlist creation: update state and show success message
+   */
+  const finalizePlaylistCreation = useCallback(
+    (data: PlaylistCreateResponse, finalName: string, message: string) => {
+      // Update the store with the new playlist ID
+      setPlaylistId(data.playlistId);
+
+      // Set the actual name used
+      setName(finalName);
+
+      // Mark all pending songs as synced
+      markPendingAsSynced();
+
+      // Set the playlist as owned
+      setIsOwned(true);
+
+      // Show success message with link to playlist
+      setSuccessMessage({
+        message,
+        playlistUrl: data.playlistUrl,
+      });
+
+      // Refresh the user's playlists
+      fetchUserPlaylists();
+    },
+    [setPlaylistId, setName, markPendingAsSynced, setIsOwned, fetchUserPlaylists]
+  );
+
+  /**
+   * Handle conflict resolution from the dialog
+   */
+  const handleConflictResolution = useCallback(
+    async (resolution: ConflictResolution) => {
+      // Close the dialog
+      setConflictDialog({ isOpen: false, playlistName: '', playlistId: '' });
+
+      if (resolution.type === 'cancel') {
+        return;
+      }
+
+      // Get pending songs and their URIs
+      const pendingSongs = songs.filter((s) => s.state === 'pending');
+      const trackUris = pendingSongs
+        .map((s) => s.spotifyTrack?.uri)
+        .filter((uri): uri is string => !!uri);
+
+      if (trackUris.length === 0) {
+        console.error('No valid track URIs found');
+        return;
+      }
+
+      setIsSaving(true);
+      setSuccessMessage(null);
+
+      try {
+        if (resolution.type === 'add-to-existing') {
+          // Add songs to the existing playlist
+          const data = await addSongsToExistingPlaylist(resolution.playlistId, trackUris);
+
+          // Find the existing playlist name
+          const existingPlaylist = userPlaylists.find((p) => p.id === resolution.playlistId);
+          const finalName = existingPlaylist?.name || conflictDialog.playlistName;
+
+          finalizePlaylistCreation(data, finalName, 'Songs added to existing playlist!');
+        } else if (resolution.type === 'replace-contents') {
+          // Get current tracks from the existing playlist to remove them
+          const tracksResponse = await fetch(
+            `/api/spotify/playlists/${resolution.playlistId}/tracks?accessToken=${encodeURIComponent(accessToken!)}`
+          );
+
+          let currentTrackUris: string[] = [];
+          if (tracksResponse.ok) {
+            const tracksData = await tracksResponse.json();
+            currentTrackUris = (tracksData.tracks || [])
+              .map((t: SpotifyTrack) => t.uri)
+              .filter((uri: string | undefined): uri is string => !!uri);
+          }
+
+          // Replace the contents
+          const data = await replacePlaylistContents(
+            resolution.playlistId,
+            currentTrackUris,
+            trackUris
+          );
+
+          // Find the existing playlist name
+          const existingPlaylist = userPlaylists.find((p) => p.id === resolution.playlistId);
+          const finalName = existingPlaylist?.name || conflictDialog.playlistName;
+
+          finalizePlaylistCreation(data, finalName, 'Playlist contents replaced!');
+        } else if (resolution.type === 'use-different-name') {
+          // Create a new playlist with the different name
+          const data = await createPlaylistOnSpotify(resolution.newName, trackUris);
+          finalizePlaylistCreation(data, resolution.newName, 'Playlist created successfully!');
+        }
+      } catch (error) {
+        console.error('Error resolving playlist conflict:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [
+      songs,
+      accessToken,
+      userPlaylists,
+      conflictDialog.playlistName,
+      addSongsToExistingPlaylist,
+      replacePlaylistContents,
+      createPlaylistOnSpotify,
+      finalizePlaylistCreation,
+    ]
+  );
+
+  /**
    * Handle creating a new playlist on Spotify
    * Called when user clicks "Create Playlist" button
+   * Checks for name conflicts before creating
    */
   const handleCreatePlaylist = useCallback(async () => {
     if (!accessToken) {
@@ -282,52 +526,25 @@ export default function Home() {
       return;
     }
 
+    // Check for name conflicts
+    const conflictingPlaylist = findConflictingPlaylist(finalName);
+    if (conflictingPlaylist) {
+      // Show conflict dialog instead of creating
+      setConflictDialog({
+        isOpen: true,
+        playlistName: conflictingPlaylist.name,
+        playlistId: conflictingPlaylist.id,
+      });
+      return;
+    }
+
+    // No conflict, proceed with creation
     setIsSaving(true);
     setSuccessMessage(null);
 
     try {
-      const response = await fetch('/api/spotify/playlist', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: finalName,
-          trackUris,
-          accessToken,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to create playlist:', errorData.message || response.status);
-        return;
-      }
-
-      const data: PlaylistCreateResponse = await response.json();
-
-      // Update the store with the new playlist ID
-      setPlaylistId(data.playlistId);
-
-      // If we had a name placeholder, set the actual name used
-      if (!playlistName.trim()) {
-        setName(finalName);
-      }
-
-      // Mark all pending songs as synced
-      markPendingAsSynced();
-
-      // Set the playlist as owned (since we just created it)
-      setIsOwned(true);
-
-      // Show success message with link to playlist
-      setSuccessMessage({
-        message: 'Playlist created successfully!',
-        playlistUrl: data.playlistUrl,
-      });
-
-      // Refresh the user's playlists so the new one appears in the dropdown
-      fetchUserPlaylists();
+      const data = await createPlaylistOnSpotify(finalName, trackUris);
+      finalizePlaylistCreation(data, finalName, 'Playlist created successfully!');
     } catch (error) {
       console.error('Error creating playlist:', error);
     } finally {
@@ -337,11 +554,9 @@ export default function Home() {
     accessToken,
     songs,
     playlistName,
-    setPlaylistId,
-    setName,
-    markPendingAsSynced,
-    setIsOwned,
-    fetchUserPlaylists,
+    findConflictingPlaylist,
+    createPlaylistOnSpotify,
+    finalizePlaylistCreation,
   ]);
 
   /**
@@ -464,99 +679,109 @@ export default function Home() {
   const isReadOnly = !isOwned;
 
   return (
-    <ThreePanelLayout
-      header={
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-900">
-              AI Playlist Generator
-            </h1>
-            <div className="text-sm text-gray-500">
-              {/* Auth status will go here */}
-            </div>
-          </div>
-
-          {/* Success message banner */}
-          {successMessage && (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span>{successMessage.message}</span>
-                <a
-                  href={successMessage.playlistUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-2 underline hover:text-green-900 font-medium"
-                >
-                  Open in Spotify
-                </a>
+    <>
+      <ThreePanelLayout
+        header={
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h1 className="text-xl font-bold text-gray-900">
+                AI Playlist Generator
+              </h1>
+              <div className="text-sm text-gray-500">
+                {/* Auth status will go here */}
               </div>
-              <button
-                onClick={dismissSuccessMessage}
-                className="text-green-600 hover:text-green-800"
-                aria-label="Dismiss"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
             </div>
-          )}
-        </div>
-      }
-      leftPanel={
-        <LeftPanel
-          onNewPlaylist={clearPlaylist}
-          onLoadExisting={handleLoadExisting}
-          onSuggestSongs={handleSuggestSongs}
-          onPlaylistNameChange={setName}
-          playlistName={playlistName}
-          isGenerating={isLoadingCandidates}
-          userPlaylists={userPlaylists}
-          isLoadingPlaylists={isLoadingPlaylists}
-        />
-      }
-      middlePanel={
-        <MiddlePanel
-          candidates={candidates}
-          onToggleSelection={toggleSelection}
-          onAddSelected={handleAddSelected}
-          isLoading={isLoadingCandidates}
-        />
-      }
-      rightPanel={
-        <RightPanel
-          songs={songs}
-          onSongClick={handleSongClick}
-          onSave={handleSave}
-          hasSpotifyPlaylist={hasSpotifyPlaylist}
-          isSaving={isSaving}
-          isReadOnly={isReadOnly}
-          isLoading={isLoadingPlaylistTracks}
-        />
-      }
-    />
+
+            {/* Success message banner */}
+            {successMessage && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+                <div className="flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span>{successMessage.message}</span>
+                  <a
+                    href={successMessage.playlistUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 underline hover:text-green-900 font-medium"
+                  >
+                    Open in Spotify
+                  </a>
+                </div>
+                <button
+                  onClick={dismissSuccessMessage}
+                  className="text-green-600 hover:text-green-800"
+                  aria-label="Dismiss"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        }
+        leftPanel={
+          <LeftPanel
+            onNewPlaylist={clearPlaylist}
+            onLoadExisting={handleLoadExisting}
+            onSuggestSongs={handleSuggestSongs}
+            onPlaylistNameChange={setName}
+            playlistName={playlistName}
+            isGenerating={isLoadingCandidates}
+            userPlaylists={userPlaylists}
+            isLoadingPlaylists={isLoadingPlaylists}
+          />
+        }
+        middlePanel={
+          <MiddlePanel
+            candidates={candidates}
+            onToggleSelection={toggleSelection}
+            onAddSelected={handleAddSelected}
+            isLoading={isLoadingCandidates}
+          />
+        }
+        rightPanel={
+          <RightPanel
+            songs={songs}
+            onSongClick={handleSongClick}
+            onSave={handleSave}
+            hasSpotifyPlaylist={hasSpotifyPlaylist}
+            isSaving={isSaving}
+            isReadOnly={isReadOnly}
+            isLoading={isLoadingPlaylistTracks}
+          />
+        }
+      />
+
+      {/* Name conflict resolution dialog */}
+      <NameConflictDialog
+        isOpen={conflictDialog.isOpen}
+        conflictingPlaylistName={conflictDialog.playlistName}
+        conflictingPlaylistId={conflictDialog.playlistId}
+        onResolve={handleConflictResolution}
+      />
+    </>
   );
 }
