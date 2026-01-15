@@ -3,7 +3,7 @@
  * Handles track search, playlist management, and recommendations
  */
 
-import type { SpotifyTrack } from '@/types';
+import type { SpotifyTrack, UserPlaylist } from '@/types';
 
 /**
  * Spotify search response type
@@ -13,6 +13,34 @@ interface SpotifySearchResponse {
     items: SpotifyTrack[];
     total: number;
   };
+}
+
+/**
+ * Spotify playlist item from /me/playlists response
+ */
+interface SpotifyPlaylistItem {
+  id: string;
+  name: string;
+  owner: {
+    id: string;
+    display_name: string | null;
+  };
+  images: Array<{ url: string; width: number | null; height: number | null }>;
+  tracks: {
+    total: number;
+  };
+}
+
+/**
+ * Spotify playlists response type (paginated)
+ */
+interface SpotifyPlaylistsResponse {
+  items: SpotifyPlaylistItem[];
+  total: number;
+  next: string | null;
+  previous: string | null;
+  offset: number;
+  limit: number;
 }
 
 /**
@@ -441,5 +469,58 @@ export class SpotifyClient {
     );
 
     return response.tracks || [];
+  }
+
+  /**
+   * Gets the current user's playlists
+   * Fetches from /v1/me/playlists endpoint with pagination support
+   * @param limit - Maximum playlists to fetch (default 50, will paginate if more are needed)
+   * @returns Array of UserPlaylist objects with isOwned flag
+   */
+  async getUserPlaylists(limit: number = 50): Promise<UserPlaylist[]> {
+    // Clamp limit to valid range (minimum 1)
+    const maxToFetch = Math.max(1, limit);
+
+    // Get current user ID for determining ownership
+    const currentUser = await this.getCurrentUser();
+    const currentUserId = currentUser.id;
+
+    // Spotify allows max 50 per request, use page size up to 50 or the requested limit
+    const pageSize = Math.min(maxToFetch, 50);
+    const playlists: UserPlaylist[] = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore && playlists.length < maxToFetch) {
+      const response = await this.get<SpotifyPlaylistsResponse>(
+        `/me/playlists?limit=${pageSize}&offset=${offset}`
+      );
+
+      const items = response.items || [];
+
+      for (const item of items) {
+        if (playlists.length >= maxToFetch) break;
+
+        playlists.push({
+          id: item.id,
+          name: item.name,
+          owner: {
+            id: item.owner.id,
+            display_name: item.owner.display_name,
+          },
+          isOwned: item.owner.id === currentUserId,
+          images: item.images || [],
+          tracks: {
+            total: item.tracks?.total || 0,
+          },
+        });
+      }
+
+      // Check if there are more pages
+      hasMore = response.next !== null && items.length === pageSize;
+      offset += pageSize;
+    }
+
+    return playlists;
   }
 }

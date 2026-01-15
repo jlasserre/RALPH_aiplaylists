@@ -70,6 +70,21 @@ export interface PlaylistCreateResponse {
   playlistUrl: string;
 }
 
+// User playlist (from /me/playlists endpoint)
+export interface UserPlaylist {
+  id: string;
+  name: string;
+  owner: {
+    id: string;
+    display_name: string | null;
+  };
+  isOwned: boolean;
+  images: Array<{ url: string; width: number | null; height: number | null }>;
+  tracks: {
+    total: number;
+  };
+}
+
 // Error types
 export interface ApiError {
   message: string;

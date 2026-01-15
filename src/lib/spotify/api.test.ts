@@ -1124,3 +1124,511 @@ describe('SpotifyClient.getRecommendations', () => {
     );
   });
 });
+
+describe('SpotifyClient.getUserPlaylists', () => {
+  let client: SpotifyClient;
+
+  const mockCurrentUser = {
+    id: 'user123',
+  };
+
+  const createMockPlaylist = (
+    id: string,
+    name: string,
+    ownerId: string,
+    ownerName: string | null = 'Test Owner'
+  ) => ({
+    id,
+    name,
+    owner: {
+      id: ownerId,
+      display_name: ownerName,
+    },
+    images: [{ url: `https://example.com/${id}.jpg`, width: 300, height: 300 }],
+    tracks: {
+      total: 10,
+    },
+  });
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    client = new SpotifyClient('test-access-token');
+  });
+
+  it('should fetch user playlists', async () => {
+    // First call: getCurrentUser
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    // Second call: /me/playlists
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [
+          createMockPlaylist('playlist1', 'My Playlist', 'user123'),
+          createMockPlaylist('playlist2', 'Followed Playlist', 'other-user'),
+        ],
+        total: 2,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('playlist1');
+    expect(result[0].name).toBe('My Playlist');
+    expect(result[0].isOwned).toBe(true);
+    expect(result[1].id).toBe('playlist2');
+    expect(result[1].name).toBe('Followed Playlist');
+    expect(result[1].isOwned).toBe(false);
+  });
+
+  it('should call correct endpoint with default limit', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    await client.getUserPlaylists();
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/me/playlists?limit=50&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should respect custom limit', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 10,
+      }),
+    });
+
+    await client.getUserPlaylists(10);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/me/playlists?limit=10&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to maximum of 50', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    await client.getUserPlaylists(100);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/me/playlists?limit=50&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should clamp limit to minimum of 1', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 1,
+      }),
+    });
+
+    await client.getUserPlaylists(0);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/me/playlists?limit=1&offset=0',
+      expect.any(Object)
+    );
+  });
+
+  it('should handle pagination to fetch more playlists', async () => {
+    // When limit > 50, we paginate. Test with limit=60 to get 2 pages of 50
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    // Create 50 playlists for first page
+    const firstPageItems = Array.from({ length: 50 }, (_, i) =>
+      createMockPlaylist(`playlist${i + 1}`, `Playlist ${i + 1}`, 'user123')
+    );
+
+    // First page - 50 playlists
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: firstPageItems,
+        total: 60,
+        next: 'https://api.spotify.com/v1/me/playlists?offset=50&limit=50',
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    // Create 10 playlists for second page
+    const secondPageItems = Array.from({ length: 10 }, (_, i) =>
+      createMockPlaylist(`playlist${i + 51}`, `Playlist ${i + 51}`, 'user123')
+    );
+
+    // Second page - remaining 10 playlists
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: secondPageItems,
+        total: 60,
+        next: null,
+        previous: 'https://api.spotify.com/v1/me/playlists?offset=0&limit=50',
+        offset: 50,
+        limit: 50,
+      }),
+    });
+
+    const result = await client.getUserPlaylists(60);
+
+    expect(result).toHaveLength(60);
+    expect(mockFetch).toHaveBeenCalledTimes(3); // getCurrentUser + 2 pages
+    // First playlists call
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://api.spotify.com/v1/me/playlists?limit=50&offset=0',
+      expect.any(Object)
+    );
+    // Second playlists call
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      'https://api.spotify.com/v1/me/playlists?limit=50&offset=50',
+      expect.any(Object)
+    );
+  });
+
+  it('should stop paginating when limit is reached', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    // First page with more items available
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [
+          createMockPlaylist('playlist1', 'Playlist 1', 'user123'),
+          createMockPlaylist('playlist2', 'Playlist 2', 'user123'),
+          createMockPlaylist('playlist3', 'Playlist 3', 'user123'),
+        ],
+        total: 10,
+        next: 'https://api.spotify.com/v1/me/playlists?offset=3',
+        previous: null,
+        offset: 0,
+        limit: 3,
+      }),
+    });
+
+    const result = await client.getUserPlaylists(2);
+
+    // Should only return 2 playlists even though 3 were in the response
+    expect(result).toHaveLength(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2); // getCurrentUser + 1 page only
+  });
+
+  it('should return empty array when user has no playlists', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [],
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result).toEqual([]);
+  });
+
+  it('should handle null items in response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => mockCurrentUser,
+    });
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: null,
+        total: 0,
+        next: null,
+        previous: null,
+        offset: 0,
+        limit: 50,
+      }),
+    });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result).toEqual([]);
+  });
+
+  it('should handle playlist with null display_name', async () => {
+    const playlistWithNullName = {
+      id: 'playlist1',
+      name: 'My Playlist',
+      owner: { id: 'user123', display_name: null },
+      images: [],
+      tracks: { total: 10 },
+    };
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [playlistWithNullName],
+          total: 1,
+          next: null,
+          previous: null,
+          offset: 0,
+          limit: 50,
+        }),
+      });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result[0].owner.display_name).toBeNull();
+  });
+
+  it('should handle playlist with no images', async () => {
+    const playlistNoImages = {
+      id: 'playlist1',
+      name: 'My Playlist',
+      owner: { id: 'user123', display_name: 'Test Owner' },
+      images: null,
+      tracks: { total: 5 },
+    };
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [playlistNoImages],
+          total: 1,
+          next: null,
+          previous: null,
+          offset: 0,
+          limit: 50,
+        }),
+      });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result[0].images).toEqual([]);
+  });
+
+  it('should handle playlist with null tracks', async () => {
+    const playlistNullTracks = {
+      id: 'playlist1',
+      name: 'My Playlist',
+      owner: { id: 'user123', display_name: 'Test Owner' },
+      images: [],
+      tracks: null,
+    };
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [playlistNullTracks],
+          total: 1,
+          next: null,
+          previous: null,
+          offset: 0,
+          limit: 50,
+        }),
+      });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result[0].tracks.total).toBe(0);
+  });
+
+  it('should propagate authentication errors from getCurrentUser', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      headers: new Headers(),
+      json: async () => ({ error: { message: 'Unauthorized' } }),
+    });
+
+    await expect(client.getUserPlaylists()).rejects.toThrow(SpotifyAuthError);
+  });
+
+  it('should propagate rate limit errors from playlists endpoint', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '30' }),
+        json: async () => ({ error: { message: 'Rate limit exceeded' } }),
+      });
+
+    await expect(client.getUserPlaylists()).rejects.toThrow(
+      SpotifyRateLimitError
+    );
+  });
+
+  it('should propagate API errors from playlists endpoint', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Internal server error' } }),
+      });
+
+    await expect(client.getUserPlaylists()).rejects.toThrow(SpotifyAPIError);
+  });
+
+  it('should correctly identify owned vs followed playlists', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockCurrentUser,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            createMockPlaylist('owned1', 'My Owned Playlist', 'user123'),
+            createMockPlaylist('followed1', 'Followed Playlist 1', 'other-user1'),
+            createMockPlaylist('owned2', 'My Second Playlist', 'user123'),
+            createMockPlaylist('followed2', 'Followed Playlist 2', 'other-user2'),
+          ],
+          total: 4,
+          next: null,
+          previous: null,
+          offset: 0,
+          limit: 50,
+        }),
+      });
+
+    const result = await client.getUserPlaylists();
+
+    expect(result[0].isOwned).toBe(true);
+    expect(result[1].isOwned).toBe(false);
+    expect(result[2].isOwned).toBe(true);
+    expect(result[3].isOwned).toBe(false);
+  });
+});
