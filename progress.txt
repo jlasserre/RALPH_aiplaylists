@@ -219,3 +219,16 @@
   - Demo data in page.tsx is useful for visual testing during development before stores are wired up
   - Separate icon components (SyncedIcon, PendingIcon, MarkedForRemovalIcon) improve readability and maintainability
 ---
+
+## 2026-01-15 - US-015
+- What was implemented: LLM types and prompt templates for song generation
+- Files changed:
+  - src/types/song.ts - created with Song interface (title, artist, album?, year?), LLMSongGenerationResponse, and LLMPlaylistNameResponse
+  - src/lib/llm/prompts.ts - created with SONG_GENERATION_SYSTEM_PROMPT (instructs LLM to return JSON array of songs), PLAYLIST_NAME_SYSTEM_PROMPT, buildSongGenerationPrompt(), buildPlaylistNamePrompt(), and LLMGenerationConfig types
+- **Learnings for future iterations:**
+  - Song interface already existed in src/types/index.ts but creating dedicated src/types/song.ts provides clearer separation for LLM-specific types
+  - System prompts should explicitly instruct the LLM to return only JSON without markdown formatting or additional text
+  - LLMGenerationConfig includes songCount, maxTokens, and temperature for customizing generation behavior
+  - Default song generation targets 20 songs with temperature 0.7 for balanced creativity
+  - Playlist name generation uses higher temperature (0.8) for more creative names
+---
