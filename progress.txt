@@ -157,3 +157,17 @@
   - The header slot pattern is useful for layout components that need to accept dynamic header content
   - Background color differentiation (bg-gray-50 vs bg-white) helps visually distinguish panels
 ---
+
+## 2026-01-15 - US-011
+- What was implemented: LeftPanel component with playlist controls
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - full-featured left panel with all required controls
+  - src/components/layout/index.ts - added LeftPanel to barrel export
+  - src/app/page.tsx - updated to use LeftPanel component
+- **Learnings for future iterations:**
+  - Custom select styling requires `appearance-none` and a positioned chevron icon
+  - The 'use client' directive is needed for components using useState
+  - Prompt validation with min/max length can use both TextArea's built-in props and custom error state
+  - LLMProvider type should be 'claude' | 'openai' to match PRD requirements
+  - The LeftPanel accepts optional callbacks (onNewPlaylist, onLoadExisting, onSuggestSongs) to be wired up by parent
+---
