@@ -1,0 +1,627 @@
+import {
+  useCandidateStore,
+  getSelectedCandidates,
+  getMatchRate,
+} from './candidateStore';
+import type { Song, SpotifyTrack } from '@/types';
+
+// Helper to create test song data with Spotify track (matched)
+function createMatchedSong(
+  title: string,
+  artist: string
+): { song: Song; spotifyTrack: SpotifyTrack } {
+  return {
+    song: {
+      title,
+      artist,
+      album: 'Test Album',
+      year: 2023,
+    },
+    spotifyTrack: {
+      id: `track_${title.replace(/\s/g, '_')}`,
+      uri: `spotify:track:${title.replace(/\s/g, '_')}`,
+      name: title,
+      artists: [{ id: 'artist_1', name: artist }],
+      album: {
+        id: 'album_1',
+        name: 'Test Album',
+        images: [{ url: 'https://example.com/image.jpg', width: 300, height: 300 }],
+      },
+      duration_ms: 180000,
+    },
+  };
+}
+
+// Helper to create unmatched song data (not found on Spotify)
+function createUnmatchedSong(
+  title: string,
+  artist: string
+): { song: Song; spotifyTrack: null } {
+  return {
+    song: {
+      title,
+      artist,
+      album: 'Test Album',
+      year: 2023,
+    },
+    spotifyTrack: null,
+  };
+}
+
+describe('candidateStore', () => {
+  // Reset store state before each test
+  beforeEach(() => {
+    useCandidateStore.setState({
+      candidates: [],
+      isLoading: false,
+    });
+  });
+
+  describe('initial state', () => {
+    it('should have empty candidates array initially', () => {
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toEqual([]);
+    });
+
+    it('should have isLoading as false initially', () => {
+      const { isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(false);
+    });
+  });
+
+  describe('setLoading', () => {
+    it('should set isLoading to true', () => {
+      useCandidateStore.getState().setLoading(true);
+      const { isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(true);
+    });
+
+    it('should set isLoading to false', () => {
+      useCandidateStore.getState().setLoading(true);
+      useCandidateStore.getState().setLoading(false);
+      const { isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(false);
+    });
+
+    it('should not affect candidates', () => {
+      const song = createMatchedSong('Test Song', 'Test Artist');
+      useCandidateStore.getState().setCandidates([song]);
+      useCandidateStore.getState().setLoading(true);
+
+      const { candidates, isLoading } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(1);
+      expect(isLoading).toBe(true);
+    });
+  });
+
+  describe('setCandidates', () => {
+    it('should set matched candidates from songs', () => {
+      const song = createMatchedSong('Bohemian Rhapsody', 'Queen');
+      useCandidateStore.getState().setCandidates([song]);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0].song.title).toBe('Bohemian Rhapsody');
+      expect(candidates[0].song.artist).toBe('Queen');
+      expect(candidates[0].isMatched).toBe(true);
+      expect(candidates[0].isSelected).toBe(false);
+    });
+
+    it('should set unmatched candidates from songs', () => {
+      const song = createUnmatchedSong('Unknown Song', 'Unknown Artist');
+      useCandidateStore.getState().setCandidates([song]);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0].song.title).toBe('Unknown Song');
+      expect(candidates[0].isMatched).toBe(false);
+      expect(candidates[0].spotifyTrack).toBeNull();
+    });
+
+    it('should generate unique IDs for each candidate', () => {
+      const song1 = createMatchedSong('Song 1', 'Artist 1');
+      const song2 = createMatchedSong('Song 2', 'Artist 2');
+
+      useCandidateStore.getState().setCandidates([song1, song2]);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].id).not.toBe(candidates[1].id);
+      expect(candidates[0].id).toMatch(/^candidate_\d+_[a-z0-9]+$/);
+    });
+
+    it('should replace existing candidates', () => {
+      const existingSong = createMatchedSong('Existing', 'Artist');
+      useCandidateStore.getState().setCandidates([existingSong]);
+
+      const newSongs = [
+        createMatchedSong('New Song 1', 'New Artist 1'),
+        createMatchedSong('New Song 2', 'New Artist 2'),
+      ];
+      useCandidateStore.getState().setCandidates(newSongs);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(2);
+      expect(candidates[0].song.title).toBe('New Song 1');
+      expect(candidates[1].song.title).toBe('New Song 2');
+    });
+
+    it('should set isLoading to false', () => {
+      useCandidateStore.getState().setLoading(true);
+      useCandidateStore.getState().setCandidates([createMatchedSong('Test', 'Artist')]);
+
+      const { isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(false);
+    });
+
+    it('should handle mixed matched and unmatched songs', () => {
+      const songs = [
+        createMatchedSong('Matched Song', 'Artist 1'),
+        createUnmatchedSong('Unmatched Song', 'Artist 2'),
+      ];
+
+      useCandidateStore.getState().setCandidates(songs);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(2);
+      expect(candidates[0].isMatched).toBe(true);
+      expect(candidates[1].isMatched).toBe(false);
+    });
+
+    it('should set all candidates as not selected initially', () => {
+      const songs = [
+        createMatchedSong('Song 1', 'Artist 1'),
+        createMatchedSong('Song 2', 'Artist 2'),
+      ];
+
+      useCandidateStore.getState().setCandidates(songs);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates.every((c) => c.isSelected === false)).toBe(true);
+    });
+
+    it('should include spotify track data for matched songs', () => {
+      const song = createMatchedSong('Test Song', 'Test Artist');
+      useCandidateStore.getState().setCandidates([song]);
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].spotifyTrack).not.toBeNull();
+      expect(candidates[0].spotifyTrack?.uri).toBe('spotify:track:Test_Song');
+    });
+  });
+
+  describe('toggleSelection', () => {
+    it('should toggle selection for matched candidate', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Test', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Test', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().toggleSelection('candidate_1');
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(true);
+    });
+
+    it('should toggle selection back to false', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Test', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Test', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().toggleSelection('candidate_1');
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(false);
+    });
+
+    it('should not allow selection for unmatched candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Test', artist: 'Artist' },
+            spotifyTrack: null,
+            isMatched: false,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().toggleSelection('candidate_1');
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(false);
+    });
+
+    it('should only affect the specified candidate', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist' },
+            spotifyTrack: { id: 'track_2', uri: 'spotify:track:2', name: 'Song 2', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().toggleSelection('candidate_1');
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(true);
+      expect(candidates[1].isSelected).toBe(false);
+    });
+
+    it('should not affect candidates with non-matching ID', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Test', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Test', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().toggleSelection('non_existent_id');
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(false);
+    });
+  });
+
+  describe('selectAll', () => {
+    it('should select all matched candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist' },
+            spotifyTrack: { id: 'track_2', uri: 'spotify:track:2', name: 'Song 2', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().selectAll();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(true);
+      expect(candidates[1].isSelected).toBe(true);
+    });
+
+    it('should not select unmatched candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist' },
+            spotifyTrack: null,
+            isMatched: false,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().selectAll();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(true);
+      expect(candidates[1].isSelected).toBe(false);
+    });
+
+    it('should have no effect when all are already selected', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().selectAll();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(true);
+    });
+  });
+
+  describe('deselectAll', () => {
+    it('should deselect all candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist' },
+            spotifyTrack: { id: 'track_2', uri: 'spotify:track:2', name: 'Song 2', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().deselectAll();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(false);
+      expect(candidates[1].isSelected).toBe(false);
+    });
+
+    it('should have no effect when none are selected', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      useCandidateStore.getState().deselectAll();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].isSelected).toBe(false);
+    });
+  });
+
+  describe('clearCandidates', () => {
+    it('should clear all candidates', () => {
+      const song = createMatchedSong('Test Song', 'Test Artist');
+      useCandidateStore.getState().setCandidates([song]);
+
+      useCandidateStore.getState().clearCandidates();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates).toEqual([]);
+    });
+
+    it('should reset isLoading to false', () => {
+      useCandidateStore.getState().setLoading(true);
+      useCandidateStore.getState().clearCandidates();
+
+      const { isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(false);
+    });
+
+    it('should clear candidates even if loading', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Test', artist: 'Artist' },
+            spotifyTrack: null,
+            isMatched: false,
+            isSelected: false,
+          },
+        ],
+        isLoading: true,
+      });
+
+      useCandidateStore.getState().clearCandidates();
+
+      const { candidates, isLoading } = useCandidateStore.getState();
+      expect(candidates).toEqual([]);
+      expect(isLoading).toBe(false);
+    });
+  });
+
+  describe('getSelectedCandidates selector', () => {
+    it('should return only selected and matched candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist 1' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist 2' },
+            spotifyTrack: { id: 'track_2', uri: 'spotify:track:2', name: 'Song 2', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+          {
+            id: 'candidate_3',
+            song: { title: 'Song 3', artist: 'Artist 3' },
+            spotifyTrack: null,
+            isMatched: false,
+            isSelected: false, // Even if selected somehow, shouldn't be returned because not matched
+          },
+        ],
+        isLoading: false,
+      });
+
+      const selected = getSelectedCandidates(useCandidateStore.getState());
+      expect(selected).toHaveLength(1);
+      expect(selected[0].song.title).toBe('Song 1');
+    });
+
+    it('should return empty array when no candidates are selected', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: false,
+          },
+        ],
+        isLoading: false,
+      });
+
+      const selected = getSelectedCandidates(useCandidateStore.getState());
+      expect(selected).toEqual([]);
+    });
+
+    it('should return empty array when candidates array is empty', () => {
+      const selected = getSelectedCandidates(useCandidateStore.getState());
+      expect(selected).toEqual([]);
+    });
+
+    it('should return all selected matched candidates', () => {
+      useCandidateStore.setState({
+        candidates: [
+          {
+            id: 'candidate_1',
+            song: { title: 'Song 1', artist: 'Artist 1' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Song 1', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+          {
+            id: 'candidate_2',
+            song: { title: 'Song 2', artist: 'Artist 2' },
+            spotifyTrack: { id: 'track_2', uri: 'spotify:track:2', name: 'Song 2', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            isMatched: true,
+            isSelected: true,
+          },
+        ],
+        isLoading: false,
+      });
+
+      const selected = getSelectedCandidates(useCandidateStore.getState());
+      expect(selected).toHaveLength(2);
+      expect(selected[0].song.title).toBe('Song 1');
+      expect(selected[1].song.title).toBe('Song 2');
+    });
+  });
+
+  describe('getMatchRate selector', () => {
+    it('should return correct match rate for all matched', () => {
+      useCandidateStore.setState({
+        candidates: [
+          { id: 'c1', song: { title: 'S1', artist: 'A1' }, spotifyTrack: { id: 't1', uri: 'u1', name: 'S1', artists: [], album: { id: 'a', name: 'A', images: [] }, duration_ms: 1 }, isMatched: true, isSelected: false },
+          { id: 'c2', song: { title: 'S2', artist: 'A2' }, spotifyTrack: { id: 't2', uri: 'u2', name: 'S2', artists: [], album: { id: 'a', name: 'A', images: [] }, duration_ms: 1 }, isMatched: true, isSelected: false },
+        ],
+        isLoading: false,
+      });
+
+      const rate = getMatchRate(useCandidateStore.getState());
+      expect(rate.matched).toBe(2);
+      expect(rate.total).toBe(2);
+      expect(rate.percentage).toBe(100);
+    });
+
+    it('should return correct match rate for partial matches', () => {
+      useCandidateStore.setState({
+        candidates: [
+          { id: 'c1', song: { title: 'S1', artist: 'A1' }, spotifyTrack: { id: 't1', uri: 'u1', name: 'S1', artists: [], album: { id: 'a', name: 'A', images: [] }, duration_ms: 1 }, isMatched: true, isSelected: false },
+          { id: 'c2', song: { title: 'S2', artist: 'A2' }, spotifyTrack: null, isMatched: false, isSelected: false },
+          { id: 'c3', song: { title: 'S3', artist: 'A3' }, spotifyTrack: { id: 't3', uri: 'u3', name: 'S3', artists: [], album: { id: 'a', name: 'A', images: [] }, duration_ms: 1 }, isMatched: true, isSelected: false },
+          { id: 'c4', song: { title: 'S4', artist: 'A4' }, spotifyTrack: null, isMatched: false, isSelected: false },
+        ],
+        isLoading: false,
+      });
+
+      const rate = getMatchRate(useCandidateStore.getState());
+      expect(rate.matched).toBe(2);
+      expect(rate.total).toBe(4);
+      expect(rate.percentage).toBe(50);
+    });
+
+    it('should return correct match rate for no matches', () => {
+      useCandidateStore.setState({
+        candidates: [
+          { id: 'c1', song: { title: 'S1', artist: 'A1' }, spotifyTrack: null, isMatched: false, isSelected: false },
+          { id: 'c2', song: { title: 'S2', artist: 'A2' }, spotifyTrack: null, isMatched: false, isSelected: false },
+        ],
+        isLoading: false,
+      });
+
+      const rate = getMatchRate(useCandidateStore.getState());
+      expect(rate.matched).toBe(0);
+      expect(rate.total).toBe(2);
+      expect(rate.percentage).toBe(0);
+    });
+
+    it('should return zeros for empty candidates', () => {
+      const rate = getMatchRate(useCandidateStore.getState());
+      expect(rate.matched).toBe(0);
+      expect(rate.total).toBe(0);
+      expect(rate.percentage).toBe(0);
+    });
+
+    it('should round percentage to nearest integer', () => {
+      useCandidateStore.setState({
+        candidates: [
+          { id: 'c1', song: { title: 'S1', artist: 'A1' }, spotifyTrack: { id: 't1', uri: 'u1', name: 'S1', artists: [], album: { id: 'a', name: 'A', images: [] }, duration_ms: 1 }, isMatched: true, isSelected: false },
+          { id: 'c2', song: { title: 'S2', artist: 'A2' }, spotifyTrack: null, isMatched: false, isSelected: false },
+          { id: 'c3', song: { title: 'S3', artist: 'A3' }, spotifyTrack: null, isMatched: false, isSelected: false },
+        ],
+        isLoading: false,
+      });
+
+      const rate = getMatchRate(useCandidateStore.getState());
+      expect(rate.matched).toBe(1);
+      expect(rate.total).toBe(3);
+      expect(rate.percentage).toBe(33); // 33.33% rounded to 33
+    });
+  });
+});

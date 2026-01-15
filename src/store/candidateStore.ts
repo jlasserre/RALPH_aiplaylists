@@ -1,0 +1,119 @@
+import { create } from 'zustand';
+import type { CandidateSong, Song, SpotifyTrack } from '@/types';
+
+interface CandidateState {
+  /** Candidate songs from current generation */
+  candidates: CandidateSong[];
+  /** Whether a generation is in progress */
+  isLoading: boolean;
+}
+
+interface CandidateActions {
+  /** Set candidates from a new generation */
+  setCandidates: (
+    songs: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }>
+  ) => void;
+  /** Toggle selection state for a candidate (only matched songs can be selected) */
+  toggleSelection: (candidateId: string) => void;
+  /** Select all matched candidates */
+  selectAll: () => void;
+  /** Deselect all candidates */
+  deselectAll: () => void;
+  /** Clear all candidates */
+  clearCandidates: () => void;
+  /** Set loading state */
+  setLoading: (isLoading: boolean) => void;
+}
+
+type CandidateStore = CandidateState & CandidateActions;
+
+/** Generate a unique ID for a candidate song */
+function generateCandidateId(): string {
+  return `candidate_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Candidate store for managing current generation candidates.
+ * Candidates are songs suggested by the LLM and searched on Spotify.
+ * - isMatched: Whether the song was found on Spotify
+ * - isSelected: Whether the user has selected this song to add to playlist
+ */
+export const useCandidateStore = create<CandidateStore>((set, get) => ({
+  // Initial state
+  candidates: [],
+  isLoading: false,
+
+  // Actions
+  setCandidates: (songs) =>
+    set({
+      candidates: songs.map((item) => ({
+        id: generateCandidateId(),
+        song: item.song,
+        spotifyTrack: item.spotifyTrack,
+        isMatched: item.spotifyTrack !== null,
+        isSelected: false,
+      })),
+      isLoading: false,
+    }),
+
+  toggleSelection: (candidateId: string) =>
+    set((state) => ({
+      candidates: state.candidates.map((candidate) => {
+        if (candidate.id !== candidateId) return candidate;
+        // Only matched songs can be selected
+        if (!candidate.isMatched) return candidate;
+        return { ...candidate, isSelected: !candidate.isSelected };
+      }),
+    })),
+
+  selectAll: () =>
+    set((state) => ({
+      candidates: state.candidates.map((candidate) =>
+        candidate.isMatched ? { ...candidate, isSelected: true } : candidate
+      ),
+    })),
+
+  deselectAll: () =>
+    set((state) => ({
+      candidates: state.candidates.map((candidate) => ({
+        ...candidate,
+        isSelected: false,
+      })),
+    })),
+
+  clearCandidates: () =>
+    set({
+      candidates: [],
+      isLoading: false,
+    }),
+
+  setLoading: (isLoading: boolean) =>
+    set({
+      isLoading,
+    }),
+}));
+
+/**
+ * Selector to get all selected candidates.
+ * Only returns candidates that are both matched and selected.
+ */
+export function getSelectedCandidates(state: CandidateState): CandidateSong[] {
+  return state.candidates.filter(
+    (candidate) => candidate.isMatched && candidate.isSelected
+  );
+}
+
+/**
+ * Selector to get the match rate for current candidates.
+ * Returns an object with matched count, total count, and percentage.
+ */
+export function getMatchRate(state: CandidateState): {
+  matched: number;
+  total: number;
+  percentage: number;
+} {
+  const total = state.candidates.length;
+  const matched = state.candidates.filter((c) => c.isMatched).length;
+  const percentage = total > 0 ? Math.round((matched / total) * 100) : 0;
+  return { matched, total, percentage };
+}
