@@ -337,3 +337,18 @@
   - Pass Retry-After header through from SpotifyRateLimitError for proper backoff in clients
   - Validate each song in array individually to provide clear error messages with index
 ---
+
+## 2026-01-15 - US-024
+- What was implemented: Spotify playlist API endpoint for creating and updating playlists
+- Files changed:
+  - src/app/api/spotify/playlist/route.ts - POST handler for creating playlists, PUT handler for updating existing playlists
+  - src/lib/spotify/api.ts - Added getCurrentUser(), createPlaylist(), addTracksToPlaylist(), removeTracksFromPlaylist() methods
+- **Learnings for future iterations:**
+  - Spotify requires user ID to create a playlist - use `/me` endpoint to get current user's ID first
+  - Spotify playlist API limits: name max 100 chars, description max 300 chars, max 100 tracks per add/remove request
+  - Use batch helper functions (addTracksInBatches, removeTracksInBatches) to handle large numbers of tracks
+  - Spotify track URIs have format `spotify:track:TRACKID` - validate with regex before sending to API
+  - When updating playlists, remove tracks first then add - avoids accidentally adding then removing same track
+  - The `delete` method for removing tracks requires body with `{ tracks: [{ uri }] }` format, not just URI strings
+  - Construct playlist URL manually for PUT responses: `https://open.spotify.com/playlist/${playlistId}`
+---
