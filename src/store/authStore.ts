@@ -7,6 +7,8 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Whether an auth operation is in progress */
   isLoading: boolean;
+  /** Whether we've already attempted to refresh the token this session */
+  hasAttemptedRefresh: boolean;
 }
 
 interface AuthActions {
@@ -16,6 +18,8 @@ interface AuthActions {
   clearAuth: () => void;
   /** Set loading state for auth operations */
   setLoading: (loading: boolean) => void;
+  /** Mark that refresh has been attempted */
+  setHasAttemptedRefresh: (value: boolean) => void;
 }
 
 type AuthStore = AuthState & AuthActions;
@@ -30,6 +34,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   accessToken: null,
   isAuthenticated: false,
   isLoading: false,
+  hasAttemptedRefresh: false,
 
   // Actions
   setAccessToken: (token: string) =>
@@ -49,5 +54,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
   setLoading: (loading: boolean) =>
     set({
       isLoading: loading,
+    }),
+
+  setHasAttemptedRefresh: (value: boolean) =>
+    set({
+      hasAttemptedRefresh: value,
     }),
 }));

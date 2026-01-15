@@ -7,6 +7,7 @@ describe('authStore', () => {
       accessToken: null,
       isAuthenticated: false,
       isLoading: false,
+      hasAttemptedRefresh: false,
     });
   });
 
@@ -109,6 +110,36 @@ describe('authStore', () => {
       expect(accessToken).toBe('test-token');
       expect(isAuthenticated).toBe(true);
       expect(isLoading).toBe(true);
+    });
+  });
+
+  describe('hasAttemptedRefresh', () => {
+    it('should be false initially', () => {
+      const { hasAttemptedRefresh } = useAuthStore.getState();
+      expect(hasAttemptedRefresh).toBe(false);
+    });
+
+    it('should be settable to true', () => {
+      useAuthStore.getState().setHasAttemptedRefresh(true);
+      const { hasAttemptedRefresh } = useAuthStore.getState();
+      expect(hasAttemptedRefresh).toBe(true);
+    });
+
+    it('should be settable back to false', () => {
+      useAuthStore.getState().setHasAttemptedRefresh(true);
+      useAuthStore.getState().setHasAttemptedRefresh(false);
+      const { hasAttemptedRefresh } = useAuthStore.getState();
+      expect(hasAttemptedRefresh).toBe(false);
+    });
+
+    it('should not affect other state properties', () => {
+      useAuthStore.getState().setAccessToken('test-token');
+      useAuthStore.getState().setHasAttemptedRefresh(true);
+
+      const { accessToken, isAuthenticated, hasAttemptedRefresh } = useAuthStore.getState();
+      expect(accessToken).toBe('test-token');
+      expect(isAuthenticated).toBe(true);
+      expect(hasAttemptedRefresh).toBe(true);
     });
   });
 });
