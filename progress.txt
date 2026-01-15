@@ -411,3 +411,18 @@
   - songCounts helper provides counts by state (synced, pending, markedForRemoval, total) for UI display
   - hasPendingChanges checks for any pending or markedForRemoval songs to determine if sync is needed
 ---
+
+## 2026-01-15 - US-029
+- What was implemented: Session persistence in localStorage using Zustand persist middleware
+- Files changed:
+  - src/store/playlistStore.ts - added persist middleware with createJSONStorage, partialize config
+  - src/store/playlistStore.test.ts - added 8 tests for persistence behavior
+- **Learnings for future iterations:**
+  - Use `persist()` and `createJSONStorage()` from 'zustand/middleware' for localStorage persistence
+  - Wrap store creator with `create<Type>()()` (extra parens) when using middleware
+  - Use `partialize` option to specify which state properties to persist (exclude actions)
+  - Export storage key constant (PLAYLIST_STORAGE_KEY) for use in tests
+  - When testing persist, localStorage.setItem is called multiple times - use `.filter().pop()` to get LAST call with the storage key
+  - Use `usePlaylistStore.persist.rehydrate()` to trigger rehydration from mocked localStorage in tests
+  - Zustand persist stores data as `{ state: {...}, version: 0 }` structure
+---
