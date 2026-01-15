@@ -606,8 +606,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 35,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added handleSuggestSongs in page.tsx that calls /api/generate then /api/spotify/search. Wired up LeftPanel onSuggestSongs and isGenerating props. Loading skeleton shows in MiddlePanel during generation."
     },
     {
       "id": "US-036",

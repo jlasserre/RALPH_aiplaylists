@@ -498,3 +498,22 @@
   - The `isOwned` flag in playlistStore drives both the song state (synced vs pending) and UI elements (banner, button label)
   - Browser testing via dev-browser skill can use localStorage manipulation to simulate different playlist states without needing real Spotify auth
 ---
+
+## 2026-01-15 - US-035
+- What was implemented: Song generation flow end-to-end wiring
+- Files changed:
+  - src/app/page.tsx - added handleSuggestSongs function, wired up onSuggestSongs and isGenerating props to LeftPanel
+- **Verification results:**
+  - Prompt textarea validates min 10 characters
+  - Suggest songs button enabled when prompt is valid
+  - Button disabled and shows loading state during generation
+  - Calls /api/generate with prompt and selected LLM provider
+  - On success, calls /api/spotify/search with generated songs
+  - Sets candidates in candidateStore for MiddlePanel display
+  - Error handling logs failures and resets loading state
+- **Learnings for future iterations:**
+  - The LeftPanel already had isGenerating and onSuggestSongs props defined from US-011 - just needed to wire them up
+  - candidateStore.setCandidates automatically sets isLoading to false - don't need to call it manually after setting candidates
+  - For browser testing without API keys, the flow still works but fails quickly at the LLM API call - skeleton loader shows briefly
+  - LLMProvider type already exists in @/types - use it for type safety in the handler
+---
