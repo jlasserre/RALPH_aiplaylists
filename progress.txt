@@ -89,3 +89,41 @@
   - The access_token cookie is temporary - it will be read by /api/auth/refresh on page load
   - Clear temporary OAuth cookies (state, code_verifier) on successful token exchange
 ---
+
+## 2026-01-15 - US-006
+- What was implemented: Token refresh API route for session persistence
+- Files changed:
+  - src/app/api/auth/refresh/route.ts - POST handler that refreshes access tokens
+- **Learnings for future iterations:**
+  - Spotify refresh token grant uses `grant_type: 'refresh_token'` with client_id and refresh_token
+  - Spotify may return a new refresh_token in the response - update the cookie if so
+  - Check for existing access_token cookie first (from OAuth callback) before using refresh_token
+  - Clear refresh_token cookie on 400/401 errors (invalid/expired token)
+  - Return `expires_in` along with access_token so client knows when to refresh
+---
+
+## 2026-01-15 - US-007
+- What was implemented: Auth Zustand store for managing Spotify authentication state
+- Files changed:
+  - src/store/authStore.ts - Zustand store with accessToken, isAuthenticated, isLoading state and actions
+  - src/store/authStore.test.ts - 13 tests for all store actions and state transitions
+- **Learnings for future iterations:**
+  - Zustand stores can be tested by using `useStore.getState()` and `useStore.setState()` directly
+  - Reset store state in `beforeEach` using `useStore.setState()` for test isolation
+  - Zustand `create<T>()` accepts a generic for full type inference
+  - Access token stored in memory only (not persisted) - refresh token is in httpOnly cookie server-side
+---
+
+## 2026-01-15 - US-008
+- What was implemented: useSpotifyAuth hook with auto-refresh on mount
+- Files changed:
+  - src/hooks/useSpotifyAuth.ts - hook that auto-refreshes access token on mount, exports login/logout functions
+  - src/hooks/useSpotifyAuth.test.ts - 11 tests covering auto-refresh, login, logout, error handling
+  - src/store/authStore.ts - added hasAttemptedRefresh state for test isolation
+  - src/store/authStore.test.ts - added 4 tests for hasAttemptedRefresh state
+- **Learnings for future iterations:**
+  - useRef values persist across Jest tests since the module is cached - use store state instead for flags that need test isolation
+  - jsdom's window.location.href cannot be redefined - test login function existence rather than actual navigation behavior
+  - React Testing Library's renderHook requires async/await with waitFor for async effects
+  - Zustand store state can be reset in beforeEach using `useStore.setState()` for proper test isolation
+---

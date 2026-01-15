@@ -113,8 +113,8 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented token refresh endpoint. First checks for existing access_token cookie (from OAuth callback), otherwise uses refresh_token to get new access_token from Spotify. Returns 401 if no refresh token or if refresh fails. Updates refresh_token cookie if Spotify returns a new one."
     },
     {
       "id": "US-007",
@@ -132,8 +132,8 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created Zustand store with accessToken (memory only), isAuthenticated, isLoading state. Implemented setAccessToken, clearAuth, setLoading actions. 13 tests covering all actions and state transitions."
     },
     {
       "id": "US-008",
@@ -148,8 +148,8 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created useSpotifyAuth hook with auto-refresh on mount. Added hasAttemptedRefresh state to authStore for proper test isolation. 11 tests for hook, 4 tests for new store state."
     },
     {
       "id": "US-009",
