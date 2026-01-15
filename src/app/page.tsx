@@ -1,4 +1,4 @@
-import { ThreePanelLayout, LeftPanel, MiddlePanel } from '@/components/layout';
+import { ThreePanelLayout, LeftPanel, MiddlePanel, RightPanel } from '@/components/layout';
 
 export default function Home() {
   return (
@@ -15,14 +15,7 @@ export default function Home() {
       }
       leftPanel={<LeftPanel />}
       middlePanel={<MiddlePanel />}
-      rightPanel={
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-800">Your Playlist</h2>
-          <p className="text-sm text-gray-500">
-            Your playlist songs will appear here.
-          </p>
-        </div>
-      }
+      rightPanel={<RightPanel />}
     />
   );
 }
