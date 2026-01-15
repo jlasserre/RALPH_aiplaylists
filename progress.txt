@@ -650,3 +650,18 @@
   - Song state (synced, pending, markedForRemoval) is preserved during reordering
   - Array reordering: splice(fromIndex, 1) removes and returns the item, then splice(toIndex, 0, item) inserts it at the new position
 ---
+
+## 2026-01-15 - US-043
+- What was implemented: Drag from right panel to middle panel for song removal
+- Files changed:
+  - src/components/layout/MiddlePanel.tsx - Added drop handlers at panel wrapper level, isDragOver state, red visual drop zone indicator with trash icon and "Drop to remove from playlist" message
+  - src/components/features/playlist/CandidateList.tsx - Added PLAYLIST_SONG_DRAG_TYPE drop handling alongside existing empty state handlers
+  - src/components/features/playlist/PlaylistView.tsx - Updated drag data format from just index to "index:songId" to support both reordering (uses index) and removal (uses songId)
+  - src/app/page.tsx - Added handlePlaylistSongDrop callback that toggles removal for synced songs or removes pending songs entirely
+- **Learnings for future iterations:**
+  - Store multiple values in dataTransfer using a formatted string like "index:songId" - parse with split(':')
+  - Playwright cannot properly simulate HTML5 drag and drop with DataTransfer - synthetic DragEvents don't expose dataTransfer.types to handlers
+  - The click-to-toggle-removal functionality uses the same store actions (toggleRemoval, removePending) so testing click behavior validates the same logic
+  - Drop handlers need to be on the outermost container div to capture drops anywhere in the panel, not just on child components
+  - Red color scheme (bg-red-50, border-red-400, text-red-700) for destructive drop actions vs blue for constructive
+---

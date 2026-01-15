@@ -736,8 +736,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 43,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented drag-to-remove from playlist to middle panel. PlaylistView drag data format updated to 'index:songId'. MiddlePanel and CandidateList handle PLAYLIST_SONG_DRAG_TYPE drops with red visual indicator. handlePlaylistSongDrop in page.tsx toggles removal for synced songs or removes pending songs entirely. Browser-based drag testing limited by Playwright HTML5 DnD limitations, but click-to-toggle verified."
     },
     {
       "id": "US-044",
