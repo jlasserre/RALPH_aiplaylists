@@ -232,3 +232,18 @@
   - Default song generation targets 20 songs with temperature 0.7 for balanced creativity
   - Playlist name generation uses higher temperature (0.8) for more creative names
 ---
+
+## 2026-01-15 - US-016
+- What was implemented: Claude LLM client for song generation
+- Files changed:
+  - src/lib/llm/claude.ts - ClaudeClient class with generateSongs() and generatePlaylistName() methods
+  - src/lib/llm/claude.test.ts - 23 tests covering song generation, name generation, and error handling
+- **Learnings for future iterations:**
+  - Anthropic SDK v0.71+ uses `messages.create()` with model, max_tokens, system, and messages params
+  - Response structure: `response.content` is an array of blocks - find `type: 'text'` block and access `.text`
+  - ClaudeAPIError custom class with statusCode and isRetryable properties helps callers handle errors appropriately
+  - 429 (rate limit) and 5xx (server errors) should be marked as retryable; 401 (auth) should not
+  - Mock Anthropic.APIError in tests by creating object with `status` property and setting prototype to APIError.prototype
+  - LLM may return markdown code blocks despite instructions - always strip ```json...``` from responses
+  - Validate Song objects by checking title/artist are non-empty strings; filter out invalid songs from response
+---
