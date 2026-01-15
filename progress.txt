@@ -633,3 +633,20 @@
   - Matched songs are draggable (draggable={candidate.isMatched}), unmatched songs cannot be dragged
   - PlaylistView handles both empty state and populated state drop zones with same handlers
 ---
+
+## 2026-01-15 - US-042
+- What was implemented: Drag and drop reordering within right panel (playlist)
+- Files changed:
+  - src/store/playlistStore.ts - Added reorderSong(fromIndex, toIndex) action that moves a song from one position to another
+  - src/store/playlistStore.test.ts - Added 11 tests for reorderSong covering edge cases (negative indices, out of bounds, same index, adjacent positions, state preservation)
+  - src/components/features/playlist/PlaylistView.tsx - Added PLAYLIST_SONG_DRAG_TYPE constant, draggable wrapper divs with drag handlers, 6-dot grip handle icon, drop position indicator (blue line with dots), opacity feedback on dragged song
+  - src/components/features/playlist/index.ts - Added PLAYLIST_SONG_DRAG_TYPE export
+  - src/components/layout/RightPanel.tsx - Added onReorder prop and passed through to PlaylistView
+  - src/app/page.tsx - Added reorderSong action from store and passed it to RightPanel as onReorder
+- **Learnings for future iterations:**
+  - Use `draggable={!!onReorder}` not just `draggable` - in JSX, `draggable` without a value becomes draggable="" which browsers treat as false
+  - Use different MIME types for different drag operations (PLAYLIST_SONG_DRAG_TYPE vs CANDIDATE_DRAG_TYPE) to distinguish between reorder and add operations
+  - The drop position indicator shows a blue horizontal line with circles at each end to indicate where the song will be inserted
+  - Song state (synced, pending, markedForRemoval) is preserved during reordering
+  - Array reordering: splice(fromIndex, 1) removes and returns the item, then splice(toIndex, 0, item) inserts it at the new position
+---
