@@ -617,3 +617,19 @@
   - The toggle removal functionality was naturally implemented as part of US-026 (playlistStore), US-028 (usePlaylist hook), and US-030 (wiring page.tsx)
   - Test coverage is comprehensive: toggleRemoval tests synced→markedForRemoval, markedForRemoval→synced, no effect on pending, only specified song affected
 ---
+
+## 2026-01-15 - US-041
+- What was implemented: Drag and drop from middle panel (candidates) to right panel (playlist)
+- Files changed:
+  - src/components/features/playlist/CandidateList.tsx - Added CANDIDATE_DRAG_TYPE constant, draggable attribute on matched songs, onDragStart handler, cursor-grab styling, and drag handle icon (6-dot grip)
+  - src/components/features/playlist/PlaylistView.tsx - Added isDragOver state, drop zone handlers (handleDragOver, handleDragEnter, handleDragLeave, handleDrop), visual blue highlight on dragover, updated empty state to support drop
+  - src/components/features/playlist/index.ts - Added CANDIDATE_DRAG_TYPE export
+  - src/components/layout/RightPanel.tsx - Added onCandidateDrop prop and passed it through to PlaylistView
+  - src/app/page.tsx - Added handleCandidateDrop callback that finds candidate by ID and adds to playlist
+- **Learnings for future iterations:**
+  - Use custom MIME type (application/x-candidate-song) for drag data transfer to avoid conflicts with other drag operations
+  - handleDragLeave needs relatedTarget check to avoid false negatives when moving between parent and child elements
+  - The candidateStore does not persist to localStorage (unlike playlistStore), so test data injection via localStorage doesn't work for candidates
+  - Matched songs are draggable (draggable={candidate.isMatched}), unmatched songs cannot be dragged
+  - PlaylistView handles both empty state and populated state drop zones with same handlers
+---

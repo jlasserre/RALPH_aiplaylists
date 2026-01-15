@@ -705,8 +705,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 41,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented drag and drop from middle panel to right panel. CandidateList makes matched songs draggable with CANDIDATE_DRAG_TYPE data transfer, cursor-grab styling, and drag handle icon. PlaylistView handles drop with visual blue highlight on dragover. handleCandidateDrop in page.tsx finds candidate by ID and adds to playlist. Browser verification confirmed instruction text appears in empty state."
     },
     {
       "id": "US-042",
