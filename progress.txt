@@ -555,3 +555,20 @@
   - Success message pattern: use state object with message and URL, render banner in header area
   - handleSave wrapper allows progressive implementation - US-037 handles create, US-038 will add update logic to same entry point
 ---
+
+## 2026-01-15 - US-038
+- What was implemented: Update Playlist flow for updating existing Spotify playlists
+- Files changed:
+  - src/app/page.tsx - Added handleUpdatePlaylist function, connected removeMarkedSongs from playlistStore, updated handleSave to route to update flow
+- **Implementation details:**
+  - handleUpdatePlaylist() collects pending songs' URIs (to add) and markedForRemoval songs' URIs (to remove)
+  - Calls PUT /api/spotify/playlist with playlistId, addUris, and removeUris
+  - On success: calls markPendingAsSynced() to change pending to synced, calls removeMarkedSongs() to remove markedForRemoval songs
+  - Shows success message banner with "Playlist updated successfully!" and link to Spotify
+  - handleSave() wrapper now routes to handleUpdatePlaylist when spotifyPlaylistId exists and isOwned is true
+- **Learnings for future iterations:**
+  - The PUT endpoint was already implemented in US-024 - just needed to wire it up from the frontend
+  - playlistStore already had markPendingAsSynced() and removeMarkedSongs() methods from US-026 - just needed to use them
+  - Browser verification using localStorage manipulation is effective for testing different song states without needing real Spotify auth
+  - The song state icons (synced/pending/markedForRemoval) properly display in the UI, confirming the PlaylistView component works correctly
+---

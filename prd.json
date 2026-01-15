@@ -658,8 +658,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 38,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added handleUpdatePlaylist function in page.tsx that calls PUT /api/spotify/playlist with addUris and removeUris, marks pending songs as synced, removes marked songs, and shows success message."
     },
     {
       "id": "US-039",
