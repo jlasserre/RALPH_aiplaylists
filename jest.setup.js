@@ -1,5 +1,16 @@
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+import { webcrypto } from 'crypto';
+
+// Polyfill TextEncoder/TextDecoder for jsdom
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
+// Polyfill crypto.subtle for jsdom
+Object.defineProperty(global, 'crypto', {
+  value: webcrypto,
+});
 
 // Mock localStorage
 const localStorageMock = {
