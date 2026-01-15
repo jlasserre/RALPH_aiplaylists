@@ -346,4 +346,79 @@ export class SpotifyClient {
     // No match found with fuzzy matching - return null
     return null;
   }
+
+  /**
+   * Gets the current user's Spotify profile
+   * @returns User profile with id
+   */
+  async getCurrentUser(): Promise<{ id: string }> {
+    return this.get<{ id: string }>('/me');
+  }
+
+  /**
+   * Creates a new playlist for the current user
+   * @param userId - Spotify user ID
+   * @param name - Playlist name
+   * @param description - Optional playlist description
+   * @param isPublic - Whether the playlist is public (default false)
+   * @returns Created playlist with id and external_urls
+   */
+  async createPlaylist(
+    userId: string,
+    name: string,
+    description?: string,
+    isPublic: boolean = false
+  ): Promise<{ id: string; external_urls: { spotify: string } }> {
+    return this.post(`/users/${userId}/playlists`, {
+      name,
+      description,
+      public: isPublic,
+    });
+  }
+
+  /**
+   * Adds tracks to a playlist
+   * @param playlistId - Spotify playlist ID
+   * @param trackUris - Array of Spotify track URIs to add
+   * @returns Snapshot ID of the updated playlist
+   */
+  async addTracksToPlaylist(
+    playlistId: string,
+    trackUris: string[]
+  ): Promise<{ snapshot_id: string }> {
+    // Spotify API allows max 100 tracks per request
+    if (trackUris.length > 100) {
+      throw new SpotifyAPIError(
+        'Cannot add more than 100 tracks at once',
+        400,
+        false
+      );
+    }
+    return this.post(`/playlists/${playlistId}/tracks`, {
+      uris: trackUris,
+    });
+  }
+
+  /**
+   * Removes tracks from a playlist
+   * @param playlistId - Spotify playlist ID
+   * @param trackUris - Array of Spotify track URIs to remove
+   * @returns Snapshot ID of the updated playlist
+   */
+  async removeTracksFromPlaylist(
+    playlistId: string,
+    trackUris: string[]
+  ): Promise<{ snapshot_id: string }> {
+    // Spotify API allows max 100 tracks per request
+    if (trackUris.length > 100) {
+      throw new SpotifyAPIError(
+        'Cannot remove more than 100 tracks at once',
+        400,
+        false
+      );
+    }
+    return this.delete(`/playlists/${playlistId}/tracks`, {
+      tracks: trackUris.map((uri) => ({ uri })),
+    });
+  }
 }
