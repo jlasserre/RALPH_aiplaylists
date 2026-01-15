@@ -187,3 +187,20 @@
   - Match rate shown as "X of Y songs found on Spotify" helps user understand search quality
   - Skeleton loaders in MiddlePanel show 6 placeholder cards with animated pulse effect
 ---
+
+## 2026-01-15 - US-013
+- What was implemented: RightPanel component with PlaylistView for displaying accumulated playlist songs
+- Files changed:
+  - src/components/layout/RightPanel.tsx - panel wrapper with skeleton loading state
+  - src/components/features/playlist/PlaylistView.tsx - playlist view with state icons, tooltips, song list, read-only banner, and Create/Update button
+  - src/components/features/playlist/index.ts - added PlaylistView export
+  - src/components/layout/index.ts - added RightPanel export
+  - src/app/page.tsx - updated to use RightPanel component
+  - eslint.config.mjs - added jest.config.js and jest.setup.js to globalIgnores to fix lint error
+- **Learnings for future iterations:**
+  - PlaylistSong type from @/types includes state field with values 'synced' | 'pending' | 'markedForRemoval'
+  - Use CSS group/group-hover pattern for showing tooltips on hover without JavaScript
+  - Read-only banner uses amber colors (bg-amber-50, border-amber-200, text-amber-800) for warning states
+  - Skeleton loaders in RightPanel match MiddlePanel pattern with 6 placeholder cards
+  - The eslint.config.mjs needed CommonJS files (jest.config.js, jest.setup.js) in globalIgnores to avoid @typescript-eslint/no-require-imports error
+---
