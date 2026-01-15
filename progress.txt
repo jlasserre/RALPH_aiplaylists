@@ -483,3 +483,18 @@
   - For followed (read-only) playlists: clear playlist ID, clear name, songs get 'pending' state (loadSongs with isOwned=false)
   - For owned playlists: set playlist ID, set name, songs get 'synced' state (loadSongs with isOwned=true)
 ---
+
+## 2026-01-15 - US-034
+- What was implemented: Verified read-only playlist handling (implementation was already in place from US-033)
+- Files changed: None (all implementation was part of US-033)
+- **Verification results:**
+  - Read-only banner: Shows "This playlist is read-only. Changes will create a new playlist." with lock icon in amber/yellow
+  - Songs state: All songs show + icon (pending) instead of music note (synced)
+  - Playlist name: Cleared to empty for user to enter new name
+  - Button label: Shows "Create Playlist" instead of "Update Playlist"
+  - Contrast verified: Owned playlists show synced icons, playlist name, and "Update Playlist" button
+- **Learnings for future iterations:**
+  - US-033 and US-034 could have been combined - the read-only handling was naturally part of the Load Existing flow
+  - The `isOwned` flag in playlistStore drives both the song state (synced vs pending) and UI elements (banner, button label)
+  - Browser testing via dev-browser skill can use localStorage manipulation to simulate different playlist states without needing real Spotify auth
+---

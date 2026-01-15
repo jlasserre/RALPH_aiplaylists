@@ -587,8 +587,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 34,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Verified in browser: read-only banner shows 'This playlist is read-only. Changes will create a new playlist.', songs marked as pending with + icon, playlist name cleared, button shows 'Create Playlist'. Implementation was already in place from US-033."
     },
     {
       "id": "US-035",
