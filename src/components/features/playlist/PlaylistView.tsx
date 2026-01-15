@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, DragEvent } from 'react';
 import { PlaylistSong } from '@/types';
 import { Button } from '@/components/ui';
 import { SongCard } from './SongCard';
+import { CANDIDATE_DRAG_TYPE } from './CandidateList';
 
 interface PlaylistViewProps {
   /** List of songs in the playlist */
@@ -17,6 +19,8 @@ interface PlaylistViewProps {
   isSaving?: boolean;
   /** Whether this is a read-only (followed) playlist */
   isReadOnly?: boolean;
+  /** Callback when a candidate is dropped onto the playlist */
+  onCandidateDrop?: (candidateId: string) => void;
 }
 
 /**
@@ -30,12 +34,61 @@ export function PlaylistView({
   hasSpotifyPlaylist = false,
   isSaving = false,
   isReadOnly = false,
+  onCandidateDrop,
 }: PlaylistViewProps) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const pendingCount = songs.filter((s) => s.state === 'pending').length;
   const markedForRemovalCount = songs.filter(
     (s) => s.state === 'markedForRemoval'
   ).length;
   const hasChanges = pendingCount > 0 || markedForRemovalCount > 0;
+
+  /**
+   * Handle drag over event to allow dropping
+   */
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    // Only allow drop if the drag contains our candidate type
+    if (e.dataTransfer.types.includes(CANDIDATE_DRAG_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    }
+  };
+
+  /**
+   * Handle drag enter to show visual feedback
+   */
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes(CANDIDATE_DRAG_TYPE)) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  /**
+   * Handle drag leave to remove visual feedback
+   */
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    // Only set isDragOver to false if we're leaving the container, not entering a child
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setIsDragOver(false);
+    }
+  };
+
+  /**
+   * Handle drop event to add the candidate to the playlist
+   */
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const candidateId = e.dataTransfer.getData(CANDIDATE_DRAG_TYPE);
+    if (candidateId && onCandidateDrop) {
+      onCandidateDrop(candidateId);
+    }
+  };
 
   // Determine button label based on playlist state
   const buttonLabel =
@@ -43,35 +96,102 @@ export function PlaylistView({
 
   if (songs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="w-16 h-16 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-          <svg
-            className="w-8 h-8 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-            />
-          </svg>
-        </div>
-        <h3 className="text-sm font-medium text-gray-900 mb-1">
-          No songs yet
-        </h3>
-        <p className="text-sm text-gray-500 max-w-xs">
-          Generate songs from the left panel and add your favorites here to build
-          your playlist.
-        </p>
+      <div
+        className={`flex flex-col items-center justify-center py-12 text-center h-full transition-colors rounded-lg ${
+          isDragOver
+            ? 'bg-blue-50 border-2 border-dashed border-blue-400'
+            : ''
+        }`}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragOver ? (
+          <>
+            <div className="w-16 h-16 mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+              <svg
+                className="w-8 h-8 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+            </div>
+            <h3 className="text-sm font-medium text-blue-700 mb-1">
+              Drop to add to playlist
+            </h3>
+          </>
+        ) : (
+          <>
+            <div className="w-16 h-16 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+              <svg
+                className="w-8 h-8 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
+              </svg>
+            </div>
+            <h3 className="text-sm font-medium text-gray-900 mb-1">
+              No songs yet
+            </h3>
+            <p className="text-sm text-gray-500 max-w-xs">
+              Generate songs from the left panel and add your favorites here to build
+              your playlist. You can also drag songs from the candidates panel.
+            </p>
+          </>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className={`flex flex-col h-full transition-colors rounded-lg ${
+        isDragOver
+          ? 'bg-blue-50 border-2 border-dashed border-blue-400'
+          : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drop zone indicator */}
+      {isDragOver && (
+        <div className="mb-4 p-3 rounded-lg bg-blue-100 border border-blue-300 text-blue-700 text-sm text-center">
+          <div className="flex items-center justify-center gap-2">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            <span>Drop to add to playlist</span>
+          </div>
+        </div>
+      )}
+
       {/* Read-only banner */}
       {isReadOnly && (
         <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">

@@ -14,6 +14,9 @@ interface CandidateListProps {
   isAdding?: boolean;
 }
 
+/** Data type identifier for drag operations */
+export const CANDIDATE_DRAG_TYPE = 'application/x-candidate-song';
+
 /**
  * List of candidate songs from the current LLM generation.
  * Shows checkboxes for selection and an "Add Selected" button.
@@ -69,9 +72,19 @@ export function CandidateList({
         {candidates.map((candidate) => (
           <div
             key={candidate.id}
+            draggable={candidate.isMatched}
+            onDragStart={(e) => {
+              if (!candidate.isMatched) {
+                e.preventDefault();
+                return;
+              }
+              // Set the drag data with the candidate ID
+              e.dataTransfer.setData(CANDIDATE_DRAG_TYPE, candidate.id);
+              e.dataTransfer.effectAllowed = 'copy';
+            }}
             className={`p-3 rounded-lg border transition-colors ${
               candidate.isMatched
-                ? 'bg-white border-gray-200 hover:border-gray-300'
+                ? 'bg-white border-gray-200 hover:border-gray-300 cursor-grab active:cursor-grabbing'
                 : 'bg-gray-50 border-gray-100 opacity-60'
             }`}
           >
@@ -104,6 +117,18 @@ export function CandidateList({
                   </div>
                 )}
               </div>
+              {/* Drag handle indicator for matched songs */}
+              {candidate.isMatched && (
+                <div className="flex-shrink-0 text-gray-300" aria-hidden="true">
+                  <svg
+                    className="w-5 h-5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
         ))}

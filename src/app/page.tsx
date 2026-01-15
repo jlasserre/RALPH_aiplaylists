@@ -186,6 +186,30 @@ export default function Home() {
   };
 
   /**
+   * Handle dropping a candidate onto the playlist.
+   * Finds the candidate by ID and adds it to the playlist.
+   */
+  const handleCandidateDrop = useCallback(
+    (candidateId: string) => {
+      // Find the candidate by ID
+      const candidate = candidates.find((c) => c.id === candidateId);
+      if (!candidate || !candidate.isMatched || !candidate.spotifyTrack) {
+        return;
+      }
+
+      // Add the song to the playlist using the playlistStore directly
+      const addSongs = usePlaylistStore.getState().addSongs;
+      addSongs([
+        {
+          song: candidate.song,
+          spotifyTrack: candidate.spotifyTrack,
+        },
+      ]);
+    },
+    [candidates]
+  );
+
+  /**
    * Handle song generation flow:
    * 1. Call /api/generate to get song suggestions from LLM
    * 2. Call /api/spotify/search to find tracks on Spotify
@@ -771,6 +795,7 @@ export default function Home() {
             isSaving={isSaving}
             isReadOnly={isReadOnly}
             isLoading={isLoadingPlaylistTracks}
+            onCandidateDrop={handleCandidateDrop}
           />
         }
       />

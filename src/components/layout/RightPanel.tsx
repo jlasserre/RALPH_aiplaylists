@@ -18,6 +18,8 @@ interface RightPanelProps {
   isReadOnly?: boolean;
   /** Whether the playlist is being loaded */
   isLoading?: boolean;
+  /** Callback when a candidate is dropped onto the playlist */
+  onCandidateDrop?: (candidateId: string) => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function RightPanel({
   isSaving = false,
   isReadOnly = false,
   isLoading = false,
+  onCandidateDrop,
 }: RightPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -66,6 +69,7 @@ export function RightPanel({
           hasSpotifyPlaylist={hasSpotifyPlaylist}
           isSaving={isSaving}
           isReadOnly={isReadOnly}
+          onCandidateDrop={onCandidateDrop}
         />
       )}
     </div>
