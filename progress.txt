@@ -3,6 +3,9 @@
 - TypeScript strict mode enabled
 - Tailwind CSS v4 with `@import "tailwindcss"` syntax
 - Path alias `@/*` maps to `./src/*`
+- Jest 30 with next/jest helper for Next.js integration
+- Tests co-located with source files (`.test.ts`, `.test.tsx`)
+- localStorage is mocked in jest.setup.js - mocks auto-clear before each test
 
 ---
 
@@ -21,4 +24,31 @@
   - create-next-app refuses to create projects in directories with capital letters in the name - use temp directory workaround
   - next-env.d.ts is auto-generated and gitignored - don't try to add it
   - Next.js 16 uses Tailwind v4 with new `@import "tailwindcss"` syntax instead of @tailwind directives
+---
+
+## 2026-01-15 - US-002
+- What was implemented: Installed dependencies and created environment config
+- Files changed:
+  - package.json - added zustand, @anthropic-ai/sdk, openai dependencies
+  - package-lock.json - updated with new dependencies
+  - .env.local.example - created with Spotify OAuth and LLM API key placeholders
+  - src/types/index.ts - created with comprehensive type definitions (Song, SpotifyTrack, PlaylistSong, CandidateSong, API responses, etc.)
+  - .gitignore - added exception for .env.local.example
+- **Learnings for future iterations:**
+  - .gitignore has `.env*` pattern that blocks .env.local.example - need to add explicit exception `!.env.local.example`
+  - Type definitions created early help maintain consistency across the codebase
+---
+
+## 2026-01-15 - US-002b
+- What was implemented: Set up Jest and React Testing Library for unit and component testing
+- Files changed:
+  - package.json - added jest, @testing-library/react, @testing-library/jest-dom, jest-environment-jsdom, @types/jest, ts-node; added test/test:watch/test:coverage/typecheck scripts
+  - jest.config.js - created with next/jest helper, jsdom environment, module aliases
+  - jest.setup.js - created with @testing-library/jest-dom import and localStorage mock
+  - src/types/index.test.ts - sample test file verifying types and localStorage mock
+- **Learnings for future iterations:**
+  - Use `next/jest` helper (createJestConfig) for seamless Next.js integration
+  - Jest 30 works with Next.js 16 - no compatibility issues
+  - localStorage mock should clear mocks in beforeEach to ensure test isolation
+  - The `typecheck` script (`tsc --noEmit`) is useful for CI validation
 ---
