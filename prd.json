@@ -217,8 +217,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created MiddlePanel.tsx and CandidateList.tsx. CandidateList shows empty state with music note icon, match rate header, candidate list with checkboxes (disabled for unmatched songs), Not found badges, and Add Selected button. MiddlePanel includes skeleton loader for loading state."
     },
     {
       "id": "US-013",

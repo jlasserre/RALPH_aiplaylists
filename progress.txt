@@ -171,3 +171,19 @@
   - LLMProvider type should be 'claude' | 'openai' to match PRD requirements
   - The LeftPanel accepts optional callbacks (onNewPlaylist, onLoadExisting, onSuggestSongs) to be wired up by parent
 ---
+
+## 2026-01-15 - US-012
+- What was implemented: MiddlePanel component with CandidateList for displaying song candidates
+- Files changed:
+  - src/components/layout/MiddlePanel.tsx - panel wrapper with skeleton loading state
+  - src/components/features/playlist/CandidateList.tsx - candidate list with checkboxes, empty state, match rate, Add Selected button
+  - src/components/features/playlist/index.ts - barrel export for playlist features
+  - src/components/layout/index.ts - added MiddlePanel export
+  - src/app/page.tsx - updated to use MiddlePanel component
+- **Learnings for future iterations:**
+  - Use Checkbox with empty label="" when label is provided separately (ARIA handled via aria-label)
+  - CandidateSong type from @/types includes isMatched and isSelected for managing selection state
+  - Unmatched songs should be disabled (not selectable) and show "Not found" badge
+  - Match rate shown as "X of Y songs found on Spotify" helps user understand search quality
+  - Skeleton loaders in MiddlePanel show 6 placeholder cards with animated pulse effect
+---
