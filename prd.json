@@ -165,8 +165,8 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created Button (3 variants, 3 sizes, loading state), Input (label, error, hint), TextArea (character count), Card (optional header), Checkbox (label, description). All accessible with ARIA attributes. Exported via index.ts."
     },
     {
       "id": "US-010",

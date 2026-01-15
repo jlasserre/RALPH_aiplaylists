@@ -127,3 +127,19 @@
   - React Testing Library's renderHook requires async/await with waitFor for async effects
   - Zustand store state can be reset in beforeEach using `useStore.setState()` for proper test isolation
 ---
+
+## 2026-01-15 - US-009
+- What was implemented: Base UI components with Tailwind CSS
+- Files changed:
+  - src/components/ui/Button.tsx - button with primary/secondary/ghost variants, sm/md/lg sizes, loading state
+  - src/components/ui/Input.tsx - input with label, error, hint support
+  - src/components/ui/TextArea.tsx - textarea with character count, label, error, hint
+  - src/components/ui/Card.tsx - card with optional header section
+  - src/components/ui/Checkbox.tsx - checkbox with label and optional description
+  - src/components/ui/index.ts - barrel export for all UI components
+- **Learnings for future iterations:**
+  - forwardRef is useful for components that need to accept refs (Button, Input, TextArea, Checkbox)
+  - useId() hook generates stable unique IDs for accessibility (label-input association)
+  - ARIA attributes: aria-invalid, aria-describedby for form validation
+  - Tailwind focus states: focus:ring-2 focus:ring-offset-2 for accessibility
+---
