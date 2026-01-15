@@ -624,4 +624,115 @@ describe('candidateStore', () => {
       expect(rate.percentage).toBe(33); // 33.33% rounded to 33
     });
   });
+
+  describe('insertCandidatesAfter', () => {
+    it('should insert candidates after specified candidate', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('Original 1', 'Artist 1');
+      const song2 = createMatchedSong('Original 2', 'Artist 2');
+      setCandidates([song1, song2]);
+
+      const candidates = useCandidateStore.getState().candidates;
+      const firstCandidateId = candidates[0].id;
+
+      const newSong = createMatchedSong('New Song', 'New Artist');
+      insertCandidatesAfter(firstCandidateId, [newSong]);
+
+      const result = useCandidateStore.getState().candidates;
+      expect(result).toHaveLength(3);
+      expect(result[0].song.title).toBe('Original 1');
+      expect(result[1].song.title).toBe('New Song');
+      expect(result[2].song.title).toBe('Original 2');
+    });
+
+    it('should auto-select matched inserted candidates', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('Original 1', 'Artist 1');
+      setCandidates([song1]);
+
+      const candidates = useCandidateStore.getState().candidates;
+      const firstCandidateId = candidates[0].id;
+
+      const matchedSong = createMatchedSong('Matched', 'Artist');
+      const unmatchedSong = createUnmatchedSong('Unmatched', 'Artist');
+      insertCandidatesAfter(firstCandidateId, [matchedSong, unmatchedSong]);
+
+      const result = useCandidateStore.getState().candidates;
+      expect(result).toHaveLength(3);
+      expect(result[1].isSelected).toBe(true);  // matched should be auto-selected
+      expect(result[2].isSelected).toBe(false); // unmatched should not be selected
+    });
+
+    it('should prepend if candidate id not found', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('Original 1', 'Artist 1');
+      setCandidates([song1]);
+
+      const newSong = createMatchedSong('New Song', 'New Artist');
+      insertCandidatesAfter('non-existent-id', [newSong]);
+
+      const result = useCandidateStore.getState().candidates;
+      expect(result).toHaveLength(2);
+      expect(result[0].song.title).toBe('New Song');
+      expect(result[1].song.title).toBe('Original 1');
+    });
+
+    it('should insert multiple candidates in order', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('Original', 'Artist');
+      setCandidates([song1]);
+
+      const candidates = useCandidateStore.getState().candidates;
+      const firstCandidateId = candidates[0].id;
+
+      const newSong1 = createMatchedSong('New 1', 'Artist');
+      const newSong2 = createMatchedSong('New 2', 'Artist');
+      const newSong3 = createMatchedSong('New 3', 'Artist');
+      insertCandidatesAfter(firstCandidateId, [newSong1, newSong2, newSong3]);
+
+      const result = useCandidateStore.getState().candidates;
+      expect(result).toHaveLength(4);
+      expect(result[0].song.title).toBe('Original');
+      expect(result[1].song.title).toBe('New 1');
+      expect(result[2].song.title).toBe('New 2');
+      expect(result[3].song.title).toBe('New 3');
+    });
+
+    it('should handle insertion at the end', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('First', 'Artist');
+      const song2 = createMatchedSong('Second', 'Artist');
+      setCandidates([song1, song2]);
+
+      const candidates = useCandidateStore.getState().candidates;
+      const lastCandidateId = candidates[1].id;
+
+      const newSong = createMatchedSong('Third', 'Artist');
+      insertCandidatesAfter(lastCandidateId, [newSong]);
+
+      const result = useCandidateStore.getState().candidates;
+      expect(result).toHaveLength(3);
+      expect(result[0].song.title).toBe('First');
+      expect(result[1].song.title).toBe('Second');
+      expect(result[2].song.title).toBe('Third');
+    });
+
+    it('should generate unique IDs for inserted candidates', () => {
+      const { setCandidates, insertCandidatesAfter } = useCandidateStore.getState();
+      const song1 = createMatchedSong('Original', 'Artist');
+      setCandidates([song1]);
+
+      const candidates = useCandidateStore.getState().candidates;
+      const firstCandidateId = candidates[0].id;
+
+      const newSong1 = createMatchedSong('New 1', 'Artist');
+      const newSong2 = createMatchedSong('New 2', 'Artist');
+      insertCandidatesAfter(firstCandidateId, [newSong1, newSong2]);
+
+      const result = useCandidateStore.getState().candidates;
+      const ids = result.map(c => c.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
+  });
 });

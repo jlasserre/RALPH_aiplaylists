@@ -26,6 +26,8 @@ interface PlaylistViewProps {
   onCandidateDrop?: (candidateId: string) => void;
   /** Callback when songs are reordered via drag and drop */
   onReorder?: (fromIndex: number, toIndex: number) => void;
+  /** Callback when "More Like This" is clicked for a song */
+  onMoreLikeThis?: (spotifyTrackId: string) => void;
 }
 
 /**
@@ -41,6 +43,7 @@ export function PlaylistView({
   isReadOnly = false,
   onCandidateDrop,
   onReorder,
+  onMoreLikeThis,
 }: PlaylistViewProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -330,6 +333,8 @@ export function PlaylistView({
                   showStateIcon
                   isClickable
                   onClick={() => onSongClick?.(playlistSong.id)}
+                  onMoreLikeThis={onMoreLikeThis}
+                  spotifyTrackId={playlistSong.spotifyTrack?.id}
                 />
               </div>
             </div>

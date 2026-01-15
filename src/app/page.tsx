@@ -43,6 +43,7 @@ export default function Home() {
   const clearCandidates = useCandidateStore((state) => state.clearCandidates);
   const setCandidates = useCandidateStore((state) => state.setCandidates);
   const setLoadingCandidates = useCandidateStore((state) => state.setLoading);
+  const insertCandidatesAfter = useCandidateStore((state) => state.insertCandidatesAfter);
 
   // User playlists state
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
@@ -226,6 +227,89 @@ export default function Home() {
       }
     },
     [songs, removePending, toggleRemoval]
+  );
+
+  /**
+   * Handle "More Like This" - fetch recommendations from Spotify and insert them.
+   * For candidates: inserts after the source song
+   * For playlist songs: inserts at the beginning of candidates
+   */
+  const handleMoreLikeThis = useCallback(
+    async (spotifyTrackId: string, sourceCandidateId?: string) => {
+      if (!accessToken) return;
+
+      try {
+        // Fetch recommendations from Spotify
+        const response = await fetch('/api/spotify/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            seedTrackId: spotifyTrackId,
+            accessToken,
+            limit: 10,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch recommendations:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+        const tracks: SpotifyTrack[] = data.tracks || [];
+
+        if (tracks.length === 0) {
+          console.log('No recommendations found');
+          return;
+        }
+
+        // Convert SpotifyTrack to Song format for the store
+        const recommendations = tracks.map((track) => ({
+          song: {
+            title: track.name,
+            artist: track.artists.map((a) => a.name).join(', '),
+            album: track.album.name,
+          },
+          spotifyTrack: track,
+        }));
+
+        // Insert after the source candidate if provided, otherwise prepend
+        if (sourceCandidateId) {
+          insertCandidatesAfter(sourceCandidateId, recommendations);
+        } else {
+          // If no source candidate (from playlist), prepend to candidates
+          insertCandidatesAfter('non-existent', recommendations);
+        }
+      } catch (error) {
+        console.error('Error fetching recommendations:', error);
+      }
+    },
+    [accessToken, insertCandidatesAfter]
+  );
+
+  /**
+   * Handle "More Like This" from candidates panel
+   * Finds the candidate by spotifyTrackId and passes its ID for insertion
+   */
+  const handleMoreLikeThisFromCandidate = useCallback(
+    (spotifyTrackId: string) => {
+      const candidate = candidates.find(
+        (c) => c.spotifyTrack?.id === spotifyTrackId
+      );
+      handleMoreLikeThis(spotifyTrackId, candidate?.id);
+    },
+    [candidates, handleMoreLikeThis]
+  );
+
+  /**
+   * Handle "More Like This" from playlist panel
+   * Just passes the track ID, recommendations go to beginning of candidates
+   */
+  const handleMoreLikeThisFromPlaylist = useCallback(
+    (spotifyTrackId: string) => {
+      handleMoreLikeThis(spotifyTrackId);
+    },
+    [handleMoreLikeThis]
   );
 
   /**
@@ -804,6 +888,7 @@ export default function Home() {
             onAddSelected={handleAddSelected}
             isLoading={isLoadingCandidates}
             onPlaylistSongDrop={handlePlaylistSongDrop}
+            onMoreLikeThis={handleMoreLikeThisFromCandidate}
           />
         }
         rightPanel={
@@ -817,6 +902,7 @@ export default function Home() {
             isLoading={isLoadingPlaylistTracks}
             onCandidateDrop={handleCandidateDrop}
             onReorder={reorderSong}
+            onMoreLikeThis={handleMoreLikeThisFromPlaylist}
           />
         }
       />

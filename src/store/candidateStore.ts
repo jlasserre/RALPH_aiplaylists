@@ -23,6 +23,11 @@ interface CandidateActions {
   clearCandidates: () => void;
   /** Set loading state */
   setLoading: (isLoading: boolean) => void;
+  /** Insert candidates after a specific candidate, auto-selected */
+  insertCandidatesAfter: (
+    afterCandidateId: string,
+    songs: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }>
+  ) => void;
 }
 
 type CandidateStore = CandidateState & CandidateActions;
@@ -90,6 +95,43 @@ export const useCandidateStore = create<CandidateStore>((set, get) => ({
   setLoading: (isLoading: boolean) =>
     set({
       isLoading,
+    }),
+
+  insertCandidatesAfter: (afterCandidateId, songs) =>
+    set((state) => {
+      const afterIndex = state.candidates.findIndex(
+        (c) => c.id === afterCandidateId
+      );
+      if (afterIndex === -1) {
+        // If candidate not found, just prepend the new songs
+        return {
+          candidates: [
+            ...songs.map((item) => ({
+              id: generateCandidateId(),
+              song: item.song,
+              spotifyTrack: item.spotifyTrack,
+              isMatched: item.spotifyTrack !== null,
+              isSelected: item.spotifyTrack !== null, // Auto-select matched songs
+            })),
+            ...state.candidates,
+          ],
+        };
+      }
+
+      // Create new candidates array with songs inserted after the specified candidate
+      const newCandidates = [...state.candidates];
+      const newSongs = songs.map((item) => ({
+        id: generateCandidateId(),
+        song: item.song,
+        spotifyTrack: item.spotifyTrack,
+        isMatched: item.spotifyTrack !== null,
+        isSelected: item.spotifyTrack !== null, // Auto-select matched songs
+      }));
+
+      // Insert after the found index
+      newCandidates.splice(afterIndex + 1, 0, ...newSongs);
+
+      return { candidates: newCandidates };
     }),
 }));
 

@@ -17,6 +17,8 @@ interface MiddlePanelProps {
   isAdding?: boolean;
   /** Callback when a playlist song is dropped for removal */
   onPlaylistSongDrop?: (songId: string) => void;
+  /** Callback when "More Like This" is clicked for a candidate */
+  onMoreLikeThis?: (spotifyTrackId: string) => void;
 }
 
 /**
@@ -30,6 +32,7 @@ export function MiddlePanel({
   isLoading = false,
   isAdding = false,
   onPlaylistSongDrop,
+  onMoreLikeThis,
 }: MiddlePanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -141,6 +144,7 @@ export function MiddlePanel({
           onAddSelected={onAddSelected}
           isAdding={isAdding}
           onPlaylistSongDrop={onPlaylistSongDrop}
+          onMoreLikeThis={onMoreLikeThis}
         />
       )}
     </div>

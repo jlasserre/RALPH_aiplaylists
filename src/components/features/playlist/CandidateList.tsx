@@ -16,6 +16,8 @@ interface CandidateListProps {
   isAdding?: boolean;
   /** Callback when a playlist song is dropped for removal */
   onPlaylistSongDrop?: (songId: string) => void;
+  /** Callback when "More Like This" is clicked for a candidate */
+  onMoreLikeThis?: (spotifyTrackId: string) => void;
 }
 
 /** Data type identifier for drag operations */
@@ -31,6 +33,7 @@ export function CandidateList({
   onAddSelected,
   isAdding = false,
   onPlaylistSongDrop,
+  onMoreLikeThis,
 }: CandidateListProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const selectedCount = candidates.filter((c) => c.isSelected).length;
@@ -236,6 +239,35 @@ export function CandidateList({
                   </div>
                 )}
               </div>
+              {/* More Like This button for matched songs */}
+              {candidate.isMatched && onMoreLikeThis && candidate.spotifyTrack && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoreLikeThis(candidate.spotifyTrack!.id);
+                  }}
+                  className="relative group p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                  aria-label="Get similar song recommendations"
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-400 group-hover:text-purple-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <div className="absolute right-0 top-6 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
+                    More like this
+                  </div>
+                </button>
+              )}
               {/* Drag handle indicator for matched songs */}
               {candidate.isMatched && (
                 <div className="flex-shrink-0 text-gray-300" aria-hidden="true">
