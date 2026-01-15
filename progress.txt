@@ -296,3 +296,17 @@
   - Use same validation rules (10-5000 chars) for consistency across generate endpoints
   - Error handling pattern with ClaudeAPIError and OpenAIAPIError is reusable across all LLM endpoints
 ---
+
+## 2026-01-15 - US-021
+- What was implemented: SpotifyClient class with authenticated request handling
+- Files changed:
+  - src/lib/spotify/api.ts - SpotifyClient class with private fetch wrapper, HTTP methods (get/post/put/delete), and error handling
+  - src/lib/spotify/api.test.ts - 30 tests covering all HTTP methods, error scenarios, and edge cases
+- **Learnings for future iterations:**
+  - Use custom error classes (SpotifyAuthError, SpotifyRateLimitError, SpotifyAPIError) for typed error handling
+  - SpotifyRateLimitError includes `retryAfter` property from Retry-After header for backoff implementation
+  - SpotifyAPIError has `isRetryable` flag set to true for 5xx errors, false for 4xx errors
+  - Global fetch can be mocked in Jest by assigning to `global.fetch = jest.fn()`
+  - Handle 204 No Content responses by returning empty object (DELETE requests often return 204)
+  - Spotify error responses have structure `{ error: { message: string } }` - extract message from this path
+---
