@@ -310,3 +310,18 @@
   - Handle 204 No Content responses by returning empty object (DELETE requests often return 204)
   - Spotify error responses have structure `{ error: { message: string } }` - extract message from this path
 ---
+
+## 2026-01-15 - US-022
+- What was implemented: Spotify track search with fuzzy matching
+- Files changed:
+  - src/lib/spotify/api.ts - Added searchTrack(title, artist) method and fuzzy matching utilities (normalizeString, levenshteinDistance, calculateSimilarity, fuzzyMatch)
+  - src/lib/spotify/api.test.ts - Added 34 tests for fuzzy matching utilities and searchTrack method
+- **Learnings for future iterations:**
+  - Use Levenshtein distance for calculating edit distance between strings (substitution, insertion, deletion)
+  - Normalize strings before matching: lowercase, remove accents (NFD + diacritics regex), remove punctuation
+  - Spotify search API accepts `track:title artist:artist` query format with `type=track` parameter
+  - When handling multi-artist tracks, check if ANY artist matches (using .some())
+  - Containment check (includes) catches cases where one string is a substring of another (e.g., "Dream" vs "Dream On")
+  - Default similarity threshold of 0.8 works well for common typos while avoiding false positives
+  - Import SpotifyTrack type from @/types to maintain consistency with the type system
+---
