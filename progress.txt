@@ -143,3 +143,17 @@
   - ARIA attributes: aria-invalid, aria-describedby for form validation
   - Tailwind focus states: focus:ring-2 focus:ring-offset-2 for accessibility
 ---
+
+## 2026-01-15 - US-010
+- What was implemented: ThreePanelLayout component for desktop/tablet three-panel UI
+- Files changed:
+  - src/components/layout/ThreePanelLayout.tsx - responsive three-panel layout with left (narrower), middle, and right panels
+  - src/components/layout/index.ts - barrel export for layout components
+  - src/app/page.tsx - updated to use ThreePanelLayout with placeholder content
+- **Learnings for future iterations:**
+  - Use flex-shrink-0 for fixed-width panels to prevent them from shrinking
+  - Use min-w-0 on flex children to allow proper text truncation
+  - overflow-y-auto on panel containers enables independent scrolling per panel
+  - The header slot pattern is useful for layout components that need to accept dynamic header content
+  - Background color differentiation (bg-gray-50 vs bg-white) helps visually distinguish panels
+---
