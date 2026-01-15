@@ -1,4 +1,4 @@
-import { usePlaylistStore } from './playlistStore';
+import { usePlaylistStore, PLAYLIST_STORAGE_KEY } from './playlistStore';
 import type { Song, SpotifyTrack } from '@/types';
 
 // Helper to create test song data
@@ -550,6 +550,143 @@ describe('playlistStore', () => {
       expect(songs).toHaveLength(2);
       expect(songs[0].id).toBe('song_1');
       expect(songs[1].id).toBe('song_2');
+    });
+  });
+
+  describe('persistence', () => {
+    it('should use the correct storage key', () => {
+      expect(PLAYLIST_STORAGE_KEY).toBe('playlist-storage');
+    });
+
+    it('should persist state to localStorage when setName is called', () => {
+      usePlaylistStore.getState().setName('Test Playlist');
+
+      // Zustand persist middleware should call setItem
+      expect(localStorage.setItem).toHaveBeenCalled();
+      // Get the LAST call with our storage key (not the first one which is the initial state)
+      const calls = (localStorage.setItem as jest.Mock).mock.calls.filter(
+        (call: string[]) => call[0] === PLAYLIST_STORAGE_KEY
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1];
+      const storedData = JSON.parse(lastCall[1]);
+      expect(storedData.state.name).toBe('Test Playlist');
+    });
+
+    it('should persist songs to localStorage when addSongs is called', () => {
+      const testSong = createTestSong('Bohemian Rhapsody', 'Queen');
+      usePlaylistStore.getState().addSongs([testSong]);
+
+      expect(localStorage.setItem).toHaveBeenCalled();
+      // Get the LAST call with our storage key
+      const calls = (localStorage.setItem as jest.Mock).mock.calls.filter(
+        (call: string[]) => call[0] === PLAYLIST_STORAGE_KEY
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1];
+      const storedData = JSON.parse(lastCall[1]);
+      expect(storedData.state.songs).toHaveLength(1);
+      expect(storedData.state.songs[0].song.title).toBe('Bohemian Rhapsody');
+    });
+
+    it('should persist spotifyPlaylistId to localStorage', () => {
+      usePlaylistStore.getState().setPlaylistId('playlist_abc123');
+
+      expect(localStorage.setItem).toHaveBeenCalled();
+      // Get the LAST call with our storage key
+      const calls = (localStorage.setItem as jest.Mock).mock.calls.filter(
+        (call: string[]) => call[0] === PLAYLIST_STORAGE_KEY
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1];
+      const storedData = JSON.parse(lastCall[1]);
+      expect(storedData.state.spotifyPlaylistId).toBe('playlist_abc123');
+    });
+
+    it('should persist isOwned to localStorage', () => {
+      usePlaylistStore.getState().setIsOwned(false);
+
+      expect(localStorage.setItem).toHaveBeenCalled();
+      // Get the LAST call with our storage key
+      const calls = (localStorage.setItem as jest.Mock).mock.calls.filter(
+        (call: string[]) => call[0] === PLAYLIST_STORAGE_KEY
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      const lastCall = calls[calls.length - 1];
+      const storedData = JSON.parse(lastCall[1]);
+      expect(storedData.state.isOwned).toBe(false);
+    });
+
+    it('should clear localStorage when clearPlaylist is called', () => {
+      // First set some state
+      usePlaylistStore.getState().setName('Test Playlist');
+      usePlaylistStore.getState().addSongs([createTestSong('Song', 'Artist')]);
+
+      // Clear the playlist
+      usePlaylistStore.getState().clearPlaylist();
+
+      // Should persist empty state
+      expect(localStorage.setItem).toHaveBeenCalled();
+      const calls = (localStorage.setItem as jest.Mock).mock.calls;
+      const lastCall = calls.filter((call: string[]) => call[0] === PLAYLIST_STORAGE_KEY).pop();
+      expect(lastCall).toBeDefined();
+      const storedData = JSON.parse(lastCall[1]);
+      expect(storedData.state.name).toBe('');
+      expect(storedData.state.songs).toEqual([]);
+      expect(storedData.state.spotifyPlaylistId).toBeNull();
+      expect(storedData.state.isOwned).toBe(true);
+    });
+
+    it('should restore state from localStorage on initialization', () => {
+      // Set up mock localStorage to return persisted data
+      const persistedState = {
+        state: {
+          name: 'Restored Playlist',
+          spotifyPlaylistId: 'playlist_restored',
+          isOwned: false,
+          songs: [{
+            id: 'song_restored',
+            song: { title: 'Restored Song', artist: 'Restored Artist' },
+            spotifyTrack: { id: 'track_1', uri: 'spotify:track:1', name: 'Restored Song', artists: [], album: { id: 'a1', name: 'Album', images: [] }, duration_ms: 180000 },
+            state: 'synced',
+          }],
+        },
+        version: 0,
+      };
+
+      // Mock getItem to return persisted data
+      (localStorage.getItem as jest.Mock).mockReturnValue(JSON.stringify(persistedState));
+
+      // Rehydrate the store
+      usePlaylistStore.persist.rehydrate();
+
+      const state = usePlaylistStore.getState();
+      expect(state.name).toBe('Restored Playlist');
+      expect(state.spotifyPlaylistId).toBe('playlist_restored');
+      expect(state.isOwned).toBe(false);
+      expect(state.songs).toHaveLength(1);
+      expect(state.songs[0].song.title).toBe('Restored Song');
+    });
+
+    it('should not persist actions, only state data', () => {
+      usePlaylistStore.getState().setName('Test');
+
+      const lastCall = (localStorage.setItem as jest.Mock).mock.calls.find(
+        (call: string[]) => call[0] === PLAYLIST_STORAGE_KEY
+      );
+      expect(lastCall).toBeDefined();
+      const storedData = JSON.parse(lastCall[1]);
+
+      // Should have state properties
+      expect(storedData.state).toHaveProperty('name');
+      expect(storedData.state).toHaveProperty('spotifyPlaylistId');
+      expect(storedData.state).toHaveProperty('isOwned');
+      expect(storedData.state).toHaveProperty('songs');
+
+      // Should NOT have action functions
+      expect(storedData.state).not.toHaveProperty('setName');
+      expect(storedData.state).not.toHaveProperty('addSongs');
+      expect(storedData.state).not.toHaveProperty('clearPlaylist');
     });
   });
 });
