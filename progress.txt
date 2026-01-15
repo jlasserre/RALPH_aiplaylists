@@ -352,3 +352,16 @@
   - The `delete` method for removing tracks requires body with `{ tracks: [{ uri }] }` format, not just URI strings
   - Construct playlist URL manually for PUT responses: `https://open.spotify.com/playlist/${playlistId}`
 ---
+
+## 2026-01-15 - US-025
+- What was implemented: Spotify recommendations API for "More Like This" feature
+- Files changed:
+  - src/lib/spotify/api.ts - Added getRecommendations(seedTrackId, limit) method
+  - src/lib/spotify/api.test.ts - Added 14 tests for getRecommendations method
+- **Learnings for future iterations:**
+  - Spotify recommendations API endpoint: `/recommendations?seed_tracks={trackId}&limit={limit}`
+  - The limit parameter is clamped to 1-100 range (Spotify's valid range), default 20
+  - The track ID should be URL encoded when constructing the query string
+  - Response structure: `{ tracks: SpotifyTrack[] }` - same SpotifyTrack type as search results
+  - The response may have null/undefined tracks property - always use `|| []` fallback
+---
