@@ -440,3 +440,18 @@
   - The pattern of passing store actions as callbacks (onNewPlaylist, onPlaylistNameChange) keeps components reusable
   - Browser verification confirmed: localStorage is properly updated when clearPlaylist is called
 ---
+
+## 2026-01-15 - US-031
+- What was implemented: Added getUserPlaylists() method to SpotifyClient for fetching user's playlists
+- Files changed:
+  - src/lib/spotify/api.ts - added getUserPlaylists(limit) method with pagination support, added SpotifyPlaylistItem and SpotifyPlaylistsResponse interfaces
+  - src/lib/spotify/api.test.ts - added 18 tests for getUserPlaylists covering all scenarios
+  - src/types/index.ts - added UserPlaylist interface with id, name, owner, isOwned, images, and tracks fields
+- **Learnings for future iterations:**
+  - Spotify /me/playlists endpoint returns paginated results with max 50 items per request
+  - Use `next` property from response to determine if more pages are available
+  - Compare owner.id with current user's ID (from /me endpoint) to determine isOwned flag
+  - The response may have null values for images, tracks, display_name - always use fallbacks (|| [] or || 0)
+  - When testing multiple sequential fetch calls, use mockFetch.mockReset() in beforeEach for proper isolation
+  - Use chained .mockResolvedValueOnce() calls for tests that make multiple sequential API requests
+---
