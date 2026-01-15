@@ -2,6 +2,7 @@
 
 import { PlaylistSong } from '@/types';
 import { Button } from '@/components/ui';
+import { SongCard } from './SongCard';
 
 interface PlaylistViewProps {
   /** List of songs in the playlist */
@@ -110,120 +111,14 @@ export function PlaylistView({
       {/* Song list */}
       <div className="flex-1 overflow-y-auto space-y-2">
         {songs.map((playlistSong) => (
-          <div
+          <SongCard
             key={playlistSong.id}
+            song={playlistSong.song}
+            state={playlistSong.state}
+            showStateIcon
+            isClickable
             onClick={() => onSongClick?.(playlistSong.id)}
-            className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-              playlistSong.state === 'markedForRemoval'
-                ? 'bg-red-50 border-red-200 hover:border-red-300'
-                : 'bg-white border-gray-200 hover:border-gray-300'
-            }`}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onSongClick?.(playlistSong.id);
-              }
-            }}
-          >
-            <div className="flex items-start gap-3">
-              {/* State icon */}
-              <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center relative">
-                {playlistSong.state === 'synced' && (
-                  <div className="relative group">
-                    <svg
-                      className="w-5 h-5 text-green-600"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-label="Synced - This song is in your Spotify playlist"
-                    >
-                      <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                    <div className="absolute left-6 top-0 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
-                      This song is in your Spotify playlist
-                    </div>
-                  </div>
-                )}
-                {playlistSong.state === 'pending' && (
-                  <div className="relative group">
-                    <svg
-                      className="w-5 h-5 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-label="Pending - This song will be added when you save"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                    <div className="absolute left-6 top-0 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
-                      This song will be added when you save
-                    </div>
-                  </div>
-                )}
-                {playlistSong.state === 'markedForRemoval' && (
-                  <div className="relative group">
-                    <svg
-                      className="w-5 h-5 text-red-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      aria-label="Marked for removal - This song will be removed when you save"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                      />
-                    </svg>
-                    <div className="absolute left-6 top-0 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
-                      This song will be removed when you save
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Song info */}
-              <div className="flex-1 min-w-0">
-                <div
-                  className={`font-medium truncate ${
-                    playlistSong.state === 'markedForRemoval'
-                      ? 'text-red-900 line-through'
-                      : 'text-gray-900'
-                  }`}
-                >
-                  {playlistSong.song.title}
-                </div>
-                <div
-                  className={`text-sm truncate ${
-                    playlistSong.state === 'markedForRemoval'
-                      ? 'text-red-700'
-                      : 'text-gray-600'
-                  }`}
-                >
-                  {playlistSong.song.artist}
-                </div>
-                {playlistSong.song.album && (
-                  <div
-                    className={`text-xs truncate ${
-                      playlistSong.state === 'markedForRemoval'
-                        ? 'text-red-500'
-                        : 'text-gray-400'
-                    }`}
-                  >
-                    {playlistSong.song.album}
-                    {playlistSong.song.year && ` • ${playlistSong.song.year}`}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          />
         ))}
       </div>
 
