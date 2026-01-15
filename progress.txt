@@ -535,3 +535,23 @@
   - When a user story's functionality is already implemented by previous stories, the story becomes a verification checkpoint
   - The usePlaylist.test.ts file provides comprehensive coverage of the add-selected flow including: adding selected candidates, clearing selections, filtering unmatched songs, handling empty selections
 ---
+
+## 2026-01-15 - US-037
+- What was implemented: Create Playlist flow to create new Spotify playlists
+- Files changed:
+  - src/app/page.tsx - Added handleCreatePlaylist function, handleSave wrapper, success message state, and UI for success banner with Spotify link
+- **Implementation details:**
+  - handleCreatePlaylist() collects pending songs' URIs, calls POST /api/spotify/playlist, and on success:
+    - Stores the new playlistId via setPlaylistId()
+    - Marks pending songs as synced via markPendingAsSynced()
+    - Sets isOwned to true
+    - Shows success message banner with "Open in Spotify" link
+  - handleSave() wrapper function decides between create (US-037) and update (US-038) based on spotifyPlaylistId existence
+  - Success message is dismissible and appears in the header
+  - Button label automatically changes from "Create Playlist" to "Update Playlist" after creation (via hasSpotifyPlaylist && isOwned check in PlaylistView)
+- **Learnings for future iterations:**
+  - The PlaylistView component already had onSave and isSaving props defined - just needed to wire them up from page.tsx
+  - Use useCallback for handlers that are passed as props to avoid unnecessary re-renders
+  - Success message pattern: use state object with message and URL, render banner in header area
+  - handleSave wrapper allows progressive implementation - US-037 handles create, US-038 will add update logic to same entry point
+---

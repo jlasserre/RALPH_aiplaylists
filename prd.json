@@ -640,8 +640,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 37,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added handleCreatePlaylist function in page.tsx that calls POST /api/spotify/playlist, stores playlistId, marks pending songs as synced, and shows success banner with Spotify link."
     },
     {
       "id": "US-038",
