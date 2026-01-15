@@ -524,8 +524,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 30,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Wired up page.tsx to use real stores (playlistStore, candidateStore). Connected LeftPanel onNewPlaylist to clearPlaylist action. Made playlistName prop controlled. Clears prompt textarea on New Playlist. Verified in browser: all panels clear correctly."
     },
     {
       "id": "US-031",

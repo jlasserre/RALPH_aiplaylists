@@ -426,3 +426,17 @@
   - Use `usePlaylistStore.persist.rehydrate()` to trigger rehydration from mocked localStorage in tests
   - Zustand persist stores data as `{ state: {...}, version: 0 }` structure
 ---
+
+## 2026-01-15 - US-030
+- What was implemented: New Playlist flow wiring up UI to real stores
+- Files changed:
+  - src/app/page.tsx - converted to client component, wired up to usePlaylist hook and useCandidateStore
+  - src/components/layout/LeftPanel.tsx - changed playlistName prop from initialPlaylistName (uncontrolled) to controlled, added handleNewPlaylist to clear prompt
+- **Learnings for future iterations:**
+  - When converting page.tsx to use hooks, add 'use client' directive at the top
+  - For controlled form inputs, parent component provides value and onChange handler - no useState inside child
+  - usePlaylist hook's clearPlaylist() already clears both playlistStore and candidateStore
+  - LeftPanel needs to clear its own internal prompt state separately since it's local state
+  - The pattern of passing store actions as callbacks (onNewPlaylist, onPlaylistNameChange) keeps components reusable
+  - Browser verification confirmed: localStorage is properly updated when clearPlaylist is called
+---
