@@ -5,13 +5,15 @@ A Next.js web app that generates Spotify playlists using LLM (Claude/OpenAI) bas
 
 ## Tech Stack
 - **Frontend**: React + Next.js 14 (App Router) + Tailwind CSS
-- **State**: Zustand (persisted to localStorage for auth tokens)
+- **State**: Zustand (access token in memory, refresh token in httpOnly cookie)
 - **Auth**: Spotify OAuth PKCE flow
-- **LLM**: Support both OpenAI and Claude (configurable)
+- **LLM**: OpenAI and Claude (user-selectable in UI)
 
 ---
 
 ## UI Layout - Three Panels
+
+> **Target platforms**: Desktop and tablet only. Mobile screens are not supported. The three-panel layout and drag-and-drop interactions are optimized for larger viewports with pointer input.
 
 ```
 ┌─────────────────┬──────────────────────┬──────────────────────┐
@@ -20,6 +22,8 @@ A Next.js web app that generates Spotify playlists using LLM (Claude/OpenAI) bas
 ├─────────────────┼──────────────────────┼──────────────────────┤
 │ [New Playlist]  │  Songs from current  │  Accumulated songs   │
 │ [Load Existing▾]│  prompt generation   │  across all prompts  │
+│                 │                      │                      │
+│ LLM: [Claude ▾] │                      │                      │
 │                 │                      │                      │
 │ Playlist Name:  │  ☑ Song A           │  🎵 Song X (synced)  │
 │ [Summer Vibes]  │  ☐ Song B           │  🎵 Song Y (synced)  │
@@ -89,7 +93,8 @@ src/
 2. Create `/api/auth/spotify` - redirect to Spotify authorization
 3. Create `/api/auth/spotify/callback` - exchange code for tokens
 4. Create `/api/auth/refresh` - refresh expired tokens
-5. Build `authStore.ts` with Zustand (persisted)
+5. Build `authStore.ts` with Zustand (access token in memory, not persisted)
+6. On page load, call `/api/auth/refresh` to obtain access token from httpOnly refresh cookie
 
 ### Phase 3: Core UI Components
 1. Build `ThreePanelLayout` - responsive layout (left/middle/right)
@@ -104,9 +109,10 @@ src/
 2. Define canonical song schema: `{ title, artist, album?, year? }`
 3. Implement `ClaudeClient` with structured prompts
 4. Implement `OpenAIClient` as alternative
-5. Add provider failover (switch if quota hit or error)
-6. Build `/api/generate` endpoint - calls LLM, returns song suggestions
-7. Add `/api/generate/suggest-name` for playlist naming
+5. Add LLM provider selector dropdown in left panel (Claude or OpenAI)
+6. Display clear error messages to user on LLM failures (no automatic failover)
+7. Build `/api/generate` endpoint - calls LLM, returns song suggestions
+8. Add `/api/generate/suggest-name` for playlist naming
 
 ### Phase 5: Spotify API Integration
 1. Build `SpotifyClient` class in `src/lib/spotify/api.ts`
@@ -242,6 +248,14 @@ src/
 - Warn when playlist is getting large (500+ songs)
 - Error messages for API failures with retry option
 
+### Unmatched Songs Handling
+When the LLM suggests songs that cannot be found on Spotify:
+
+**Display behavior:**
+- Unmatched songs appear in the candidate list with a "Not found" badge (greyed out)
+- Match rate shown prominently: "15 of 20 songs found on Spotify"
+- Unmatched songs are not selectable for adding to playlist
+
 ---
 
 ## Performance
@@ -265,8 +279,10 @@ src/
 ### OAuth Token Handling
 - **PKCE**: Code verifier never leaves client until token exchange
 - **Token exchange**: Happens server-side only (via API route)
-- **Storage**: Use httpOnly cookies for refresh token (preferred)
-  - Fallback: localStorage with CSP headers + Trusted Types
+- **Token storage** (hybrid approach):
+  - **Refresh token**: Stored in httpOnly cookie (set by `/api/auth/spotify/callback`), immune to XSS
+  - **Access token**: Stored in memory via Zustand (not persisted), short-lived (~1 hour)
+  - On page load, `/api/auth/refresh` is called to obtain a fresh access token from the cookie
   - Never store client_secret on frontend
 
 ### LLM Security
@@ -298,7 +314,7 @@ NEXT_PUBLIC_SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/spotify/callback
 # LLM APIs
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-LLM_PROVIDER=claude
+LLM_DEFAULT_PROVIDER=claude  # Default selection in UI (user can change)
 ```
 
 ---
