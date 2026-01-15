@@ -365,3 +365,19 @@
   - Response structure: `{ tracks: SpotifyTrack[] }` - same SpotifyTrack type as search results
   - The response may have null/undefined tracks property - always use `|| []` fallback
 ---
+
+## 2026-01-15 - US-026
+- What was implemented: Playlist Zustand store for managing playlist state
+- Files changed:
+  - src/store/playlistStore.ts - Zustand store with playlist name, spotifyPlaylistId, isOwned, and songs state
+  - src/store/playlistStore.test.ts - 43 tests covering all actions and state transitions
+- **Learnings for future iterations:**
+  - PlaylistSong type uses SongState ('synced' | 'pending' | 'markedForRemoval') to track sync status
+  - generateSongId() creates unique IDs with timestamp + random string pattern: `song_${Date.now()}_${random}`
+  - loadSongs(songs, isOwned) replaces all songs - use this when loading existing playlists from Spotify
+  - addSongs(songs) appends songs with 'pending' state - use this when adding from candidates
+  - toggleRemoval only works on synced/markedForRemoval songs, not pending songs
+  - removePending only removes songs that are both matching ID AND in 'pending' state
+  - clearPlaylist resets all state including isOwned back to true (for "New Playlist" flow)
+  - markPendingAsSynced and removeMarkedSongs are helper methods for post-sync state updates
+---
