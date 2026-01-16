@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLLMClient, LLMProvider, ClaudeAPIError, OpenAIAPIError } from '@/lib/llm';
 import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { sanitizePrompt } from '@/lib/llm/sanitize';
 
 /**
  * Request body for playlist name suggestion
@@ -81,20 +82,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestNa
       );
     }
 
-    // Validate prompt length
-    const trimmedPrompt = prompt.trim();
-    if (trimmedPrompt.length < MIN_PROMPT_LENGTH) {
+    // Sanitize and validate prompt
+    const { sanitizedPrompt, hasSuspiciousContent } = sanitizePrompt(prompt);
+
+    // Validate sanitized prompt length
+    if (sanitizedPrompt.length < MIN_PROMPT_LENGTH) {
       return NextResponse.json(
         { error: `Prompt must be at least ${MIN_PROMPT_LENGTH} characters` },
         { status: 400 }
       );
     }
 
-    if (trimmedPrompt.length > MAX_PROMPT_LENGTH) {
+    if (sanitizedPrompt.length > MAX_PROMPT_LENGTH) {
       return NextResponse.json(
         { error: `Prompt must not exceed ${MAX_PROMPT_LENGTH} characters` },
         { status: 400 }
       );
+    }
+
+    // Note: We continue with sanitized prompt even if suspicious content was detected
+    if (hasSuspiciousContent) {
+      console.warn('[/api/generate/suggest-name] Suspicious content detected in prompt, continuing with sanitized version');
     }
 
     // Validate provider
@@ -114,7 +122,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestNa
 
     // Get LLM client and generate playlist name
     const client = getLLMClient(provider as LLMProvider);
-    const name = await client.generatePlaylistName(trimmedPrompt);
+    const name = await client.generatePlaylistName(sanitizedPrompt);
 
     return NextResponse.json({ name });
   } catch (error) {
