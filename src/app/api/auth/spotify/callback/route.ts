@@ -109,8 +109,10 @@ export async function GET(request: NextRequest) {
     const tokenData: SpotifyTokenResponse = await tokenResponse.json();
 
     // Create response with redirect
+    // Use the redirect URI's origin to ensure cookie domain matches
+    const redirectOrigin = new URL(redirectUri).origin;
     const response = NextResponse.redirect(
-      new URL('/?auth=success', request.url)
+      new URL('/?auth=success', redirectOrigin)
     );
 
     // Store refresh token in httpOnly cookie

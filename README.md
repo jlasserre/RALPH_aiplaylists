@@ -157,6 +157,12 @@ npm run test:coverage # Run tests with coverage report
 
 This project was built following the [Getting Started With Ralph](https://www.aihero.dev/getting-started-with-ralph) tutorial from AI Hero. Ralph is an autonomous AI agent loop technique that runs Claude Code repeatedly until all PRD (Product Requirements Document) items are complete.
 
+### Skills
+
+This project uses the following Claude Code skills:
+
+- **dev-browser** - Browser automation for visual verification of UI changes. Created by [Sawyer Hood](https://github.com/SawyerHood/dev-browser).
+
 ## License
 
 MIT
