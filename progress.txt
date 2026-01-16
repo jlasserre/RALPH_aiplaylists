@@ -888,3 +888,20 @@
   - The showLoginPrompt condition must wait for both hydration AND auth check completion to avoid flicker
   - Trusted Types CSP policy (require-trusted-types-for 'script') causes console errors in dev mode but doesn't break React rendering
 ---
+
+## 2026-01-16 - US-062
+- What was implemented: Search results caching to reduce Spotify API calls
+- Files changed:
+  - src/store/searchCacheStore.ts - New Zustand store with cache Map, getCached/setCache/has/clearCache actions, generateCacheKey helper
+  - src/store/searchCacheStore.test.ts - 23 tests covering cache hit/miss, normalized keys, invalidation
+  - src/app/page.tsx - Updated handleSuggestSongs to check cache before API call, cache results on receive, map stream index back to original index
+  - src/hooks/usePlaylist.ts - Added useSearchCacheStore import, clearCache call in clearPlaylist action
+  - src/hooks/usePlaylist.test.ts - Added test for cache clearing on clearPlaylist
+- **Learnings for future iterations:**
+  - Separate cache store (not in candidateStore) keeps concerns separated and is clearer
+  - Cache key normalization: lowercase, trim, remove diacritics (NFD + regex), remove punctuation, collapse whitespace
+  - When caching is added to a streaming flow, must map stream indices back to original indices if only subset of items are sent to API
+  - Cache entry includes timestamp (cachedAt) for potential future TTL implementation
+  - Client-side caching is simpler than server-side - no need to modify API routes, just check cache before calling
+  - The `uncachedSongs` array stores both original index and song, allowing proper index mapping when results return
+---
