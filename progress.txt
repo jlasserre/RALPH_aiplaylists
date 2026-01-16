@@ -1,0 +1,960 @@
+## Codebase Patterns
+- Next.js 16.1.2 with App Router (src/app/ directory structure)
+- TypeScript strict mode enabled
+- Tailwind CSS v4 with `@import "tailwindcss"` syntax
+- Path alias `@/*` maps to `./src/*`
+- Jest 30 with next/jest helper for Next.js integration
+- Tests co-located with source files (`.test.ts`, `.test.tsx`)
+- localStorage is mocked in jest.setup.js - mocks auto-clear before each test
+- Web Crypto API (TextEncoder, crypto.subtle) polyfilled in jest.setup.js for jsdom
+
+---
+
+## 2026-01-15 - US-001
+- What was implemented: Initialized Next.js project with TypeScript and Tailwind CSS
+- Files changed:
+  - package.json - project config with ai-playlist-generator name
+  - tsconfig.json - TypeScript config with strict mode
+  - src/app/layout.tsx - root layout with metadata
+  - src/app/page.tsx - basic home page component
+  - src/app/globals.css - Tailwind CSS imports and theme variables
+  - eslint.config.mjs - ESLint configuration
+  - next.config.ts - Next.js configuration
+  - postcss.config.mjs - PostCSS config for Tailwind
+- **Learnings for future iterations:**
+  - create-next-app refuses to create projects in directories with capital letters in the name - use temp directory workaround
+  - next-env.d.ts is auto-generated and gitignored - don't try to add it
+  - Next.js 16 uses Tailwind v4 with new `@import "tailwindcss"` syntax instead of @tailwind directives
+---
+
+## 2026-01-15 - US-002
+- What was implemented: Installed dependencies and created environment config
+- Files changed:
+  - package.json - added zustand, @anthropic-ai/sdk, openai dependencies
+  - package-lock.json - updated with new dependencies
+  - .env.local.example - created with Spotify OAuth and LLM API key placeholders
+  - src/types/index.ts - created with comprehensive type definitions (Song, SpotifyTrack, PlaylistSong, CandidateSong, API responses, etc.)
+  - .gitignore - added exception for .env.local.example
+- **Learnings for future iterations:**
+  - .gitignore has `.env*` pattern that blocks .env.local.example - need to add explicit exception `!.env.local.example`
+  - Type definitions created early help maintain consistency across the codebase
+---
+
+## 2026-01-15 - US-002b
+- What was implemented: Set up Jest and React Testing Library for unit and component testing
+- Files changed:
+  - package.json - added jest, @testing-library/react, @testing-library/jest-dom, jest-environment-jsdom, @types/jest, ts-node; added test/test:watch/test:coverage/typecheck scripts
+  - jest.config.js - created with next/jest helper, jsdom environment, module aliases
+  - jest.setup.js - created with @testing-library/jest-dom import and localStorage mock
+  - src/types/index.test.ts - sample test file verifying types and localStorage mock
+- **Learnings for future iterations:**
+  - Use `next/jest` helper (createJestConfig) for seamless Next.js integration
+  - Jest 30 works with Next.js 16 - no compatibility issues
+  - localStorage mock should clear mocks in beforeEach to ensure test isolation
+  - The `typecheck` script (`tsc --noEmit`) is useful for CI validation
+---
+
+## 2026-01-15 - US-003
+- What was implemented: PKCE utility functions for Spotify OAuth
+- Files changed:
+  - src/lib/spotify/auth.ts - created with generateCodeVerifier, generateCodeChallenge, generateRandomState functions
+  - src/lib/spotify/auth.test.ts - comprehensive tests for all PKCE functions
+  - jest.setup.js - added TextEncoder, TextDecoder, and crypto.subtle polyfills for Web Crypto API support
+- **Learnings for future iterations:**
+  - jsdom environment doesn't include TextEncoder/TextDecoder - import from 'util' and set on global
+  - jsdom doesn't have crypto.subtle - use webcrypto from 'crypto' module and define on global.crypto
+  - Jest 30 uses `--testPathPatterns` instead of `--testPathPattern` (or just pass file path directly)
+  - RFC 7636 PKCE test vector: verifier "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" produces challenge "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+---
+
+## 2026-01-15 - US-004
+- What was implemented: Spotify OAuth initiation API route
+- Files changed:
+  - src/app/api/auth/spotify/route.ts - GET handler that generates PKCE values, stores them in httpOnly cookies, and redirects to Spotify authorization
+- **Learnings for future iterations:**
+  - Next.js 16 cookies() is async - must await the call before using set()
+  - Cookie options: httpOnly for security, sameSite 'lax' for OAuth redirects, secure in production only
+  - Spotify OAuth scopes: playlist-read-private, playlist-modify-public, playlist-modify-private are needed for this app
+  - Store both code_verifier (for token exchange) and state (for CSRF protection) in cookies
+---
+
+## 2026-01-15 - US-005
+- What was implemented: Spotify OAuth callback API route that completes the PKCE flow
+- Files changed:
+  - src/app/api/auth/spotify/callback/route.ts - GET handler that exchanges auth code for tokens
+- **Learnings for future iterations:**
+  - When setting/deleting cookies in a redirect response, use `response.cookies.set()` and `response.cookies.delete()` instead of the `cookies()` store directly
+  - Spotify returns tokens as JSON with: access_token, token_type, scope, expires_in, refresh_token
+  - Store both refresh_token (30 days) and access_token (expires_in from response) in httpOnly cookies
+  - The access_token cookie is temporary - it will be read by /api/auth/refresh on page load
+  - Clear temporary OAuth cookies (state, code_verifier) on successful token exchange
+---
+
+## 2026-01-15 - US-006
+- What was implemented: Token refresh API route for session persistence
+- Files changed:
+  - src/app/api/auth/refresh/route.ts - POST handler that refreshes access tokens
+- **Learnings for future iterations:**
+  - Spotify refresh token grant uses `grant_type: 'refresh_token'` with client_id and refresh_token
+  - Spotify may return a new refresh_token in the response - update the cookie if so
+  - Check for existing access_token cookie first (from OAuth callback) before using refresh_token
+  - Clear refresh_token cookie on 400/401 errors (invalid/expired token)
+  - Return `expires_in` along with access_token so client knows when to refresh
+---
+
+## 2026-01-15 - US-007
+- What was implemented: Auth Zustand store for managing Spotify authentication state
+- Files changed:
+  - src/store/authStore.ts - Zustand store with accessToken, isAuthenticated, isLoading state and actions
+  - src/store/authStore.test.ts - 13 tests for all store actions and state transitions
+- **Learnings for future iterations:**
+  - Zustand stores can be tested by using `useStore.getState()` and `useStore.setState()` directly
+  - Reset store state in `beforeEach` using `useStore.setState()` for test isolation
+  - Zustand `create<T>()` accepts a generic for full type inference
+  - Access token stored in memory only (not persisted) - refresh token is in httpOnly cookie server-side
+---
+
+## 2026-01-15 - US-008
+- What was implemented: useSpotifyAuth hook with auto-refresh on mount
+- Files changed:
+  - src/hooks/useSpotifyAuth.ts - hook that auto-refreshes access token on mount, exports login/logout functions
+  - src/hooks/useSpotifyAuth.test.ts - 11 tests covering auto-refresh, login, logout, error handling
+  - src/store/authStore.ts - added hasAttemptedRefresh state for test isolation
+  - src/store/authStore.test.ts - added 4 tests for hasAttemptedRefresh state
+- **Learnings for future iterations:**
+  - useRef values persist across Jest tests since the module is cached - use store state instead for flags that need test isolation
+  - jsdom's window.location.href cannot be redefined - test login function existence rather than actual navigation behavior
+  - React Testing Library's renderHook requires async/await with waitFor for async effects
+  - Zustand store state can be reset in beforeEach using `useStore.setState()` for proper test isolation
+---
+
+## 2026-01-15 - US-009
+- What was implemented: Base UI components with Tailwind CSS
+- Files changed:
+  - src/components/ui/Button.tsx - button with primary/secondary/ghost variants, sm/md/lg sizes, loading state
+  - src/components/ui/Input.tsx - input with label, error, hint support
+  - src/components/ui/TextArea.tsx - textarea with character count, label, error, hint
+  - src/components/ui/Card.tsx - card with optional header section
+  - src/components/ui/Checkbox.tsx - checkbox with label and optional description
+  - src/components/ui/index.ts - barrel export for all UI components
+- **Learnings for future iterations:**
+  - forwardRef is useful for components that need to accept refs (Button, Input, TextArea, Checkbox)
+  - useId() hook generates stable unique IDs for accessibility (label-input association)
+  - ARIA attributes: aria-invalid, aria-describedby for form validation
+  - Tailwind focus states: focus:ring-2 focus:ring-offset-2 for accessibility
+---
+
+## 2026-01-15 - US-010
+- What was implemented: ThreePanelLayout component for desktop/tablet three-panel UI
+- Files changed:
+  - src/components/layout/ThreePanelLayout.tsx - responsive three-panel layout with left (narrower), middle, and right panels
+  - src/components/layout/index.ts - barrel export for layout components
+  - src/app/page.tsx - updated to use ThreePanelLayout with placeholder content
+- **Learnings for future iterations:**
+  - Use flex-shrink-0 for fixed-width panels to prevent them from shrinking
+  - Use min-w-0 on flex children to allow proper text truncation
+  - overflow-y-auto on panel containers enables independent scrolling per panel
+  - The header slot pattern is useful for layout components that need to accept dynamic header content
+  - Background color differentiation (bg-gray-50 vs bg-white) helps visually distinguish panels
+---
+
+## 2026-01-15 - US-011
+- What was implemented: LeftPanel component with playlist controls
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - full-featured left panel with all required controls
+  - src/components/layout/index.ts - added LeftPanel to barrel export
+  - src/app/page.tsx - updated to use LeftPanel component
+- **Learnings for future iterations:**
+  - Custom select styling requires `appearance-none` and a positioned chevron icon
+  - The 'use client' directive is needed for components using useState
+  - Prompt validation with min/max length can use both TextArea's built-in props and custom error state
+  - LLMProvider type should be 'claude' | 'openai' to match PRD requirements
+  - The LeftPanel accepts optional callbacks (onNewPlaylist, onLoadExisting, onSuggestSongs) to be wired up by parent
+---
+
+## 2026-01-15 - US-012
+- What was implemented: MiddlePanel component with CandidateList for displaying song candidates
+- Files changed:
+  - src/components/layout/MiddlePanel.tsx - panel wrapper with skeleton loading state
+  - src/components/features/playlist/CandidateList.tsx - candidate list with checkboxes, empty state, match rate, Add Selected button
+  - src/components/features/playlist/index.ts - barrel export for playlist features
+  - src/components/layout/index.ts - added MiddlePanel export
+  - src/app/page.tsx - updated to use MiddlePanel component
+- **Learnings for future iterations:**
+  - Use Checkbox with empty label="" when label is provided separately (ARIA handled via aria-label)
+  - CandidateSong type from @/types includes isMatched and isSelected for managing selection state
+  - Unmatched songs should be disabled (not selectable) and show "Not found" badge
+  - Match rate shown as "X of Y songs found on Spotify" helps user understand search quality
+  - Skeleton loaders in MiddlePanel show 6 placeholder cards with animated pulse effect
+---
+
+## 2026-01-15 - US-013
+- What was implemented: RightPanel component with PlaylistView for displaying accumulated playlist songs
+- Files changed:
+  - src/components/layout/RightPanel.tsx - panel wrapper with skeleton loading state
+  - src/components/features/playlist/PlaylistView.tsx - playlist view with state icons, tooltips, song list, read-only banner, and Create/Update button
+  - src/components/features/playlist/index.ts - added PlaylistView export
+  - src/components/layout/index.ts - added RightPanel export
+  - src/app/page.tsx - updated to use RightPanel component
+  - eslint.config.mjs - added jest.config.js and jest.setup.js to globalIgnores to fix lint error
+- **Learnings for future iterations:**
+  - PlaylistSong type from @/types includes state field with values 'synced' | 'pending' | 'markedForRemoval'
+  - Use CSS group/group-hover pattern for showing tooltips on hover without JavaScript
+  - Read-only banner uses amber colors (bg-amber-50, border-amber-200, text-amber-800) for warning states
+  - Skeleton loaders in RightPanel match MiddlePanel pattern with 6 placeholder cards
+  - The eslint.config.mjs needed CommonJS files (jest.config.js, jest.setup.js) in globalIgnores to avoid @typescript-eslint/no-require-imports error
+---
+
+## 2026-01-15 - US-014
+- What was implemented: SongCard component with state icons and tooltips
+- Files changed:
+  - src/components/features/playlist/SongCard.tsx - reusable song card with state icons (synced, pending, markedForRemoval), tooltips, and click handler
+  - src/components/features/playlist/PlaylistView.tsx - updated to use SongCard component instead of inline rendering
+  - src/components/features/playlist/index.ts - added SongCard export
+  - src/app/page.tsx - added demo data for development testing (demoPlaylistSongs, demoCandidateSongs)
+- **Learnings for future iterations:**
+  - Extract reusable components (like SongCard) when rendering patterns are duplicated across components
+  - State icons with tooltips can use CSS group/group-hover pattern for hover effects
+  - The SongCard component supports both playlist (with state icons) and candidate (without state icons) use cases via props
+  - Demo data in page.tsx is useful for visual testing during development before stores are wired up
+  - Separate icon components (SyncedIcon, PendingIcon, MarkedForRemovalIcon) improve readability and maintainability
+---
+
+## 2026-01-15 - US-015
+- What was implemented: LLM types and prompt templates for song generation
+- Files changed:
+  - src/types/song.ts - created with Song interface (title, artist, album?, year?), LLMSongGenerationResponse, and LLMPlaylistNameResponse
+  - src/lib/llm/prompts.ts - created with SONG_GENERATION_SYSTEM_PROMPT (instructs LLM to return JSON array of songs), PLAYLIST_NAME_SYSTEM_PROMPT, buildSongGenerationPrompt(), buildPlaylistNamePrompt(), and LLMGenerationConfig types
+- **Learnings for future iterations:**
+  - Song interface already existed in src/types/index.ts but creating dedicated src/types/song.ts provides clearer separation for LLM-specific types
+  - System prompts should explicitly instruct the LLM to return only JSON without markdown formatting or additional text
+  - LLMGenerationConfig includes songCount, maxTokens, and temperature for customizing generation behavior
+  - Default song generation targets 20 songs with temperature 0.7 for balanced creativity
+  - Playlist name generation uses higher temperature (0.8) for more creative names
+---
+
+## 2026-01-15 - US-016
+- What was implemented: Claude LLM client for song generation
+- Files changed:
+  - src/lib/llm/claude.ts - ClaudeClient class with generateSongs() and generatePlaylistName() methods
+  - src/lib/llm/claude.test.ts - 23 tests covering song generation, name generation, and error handling
+- **Learnings for future iterations:**
+  - Anthropic SDK v0.71+ uses `messages.create()` with model, max_tokens, system, and messages params
+  - Response structure: `response.content` is an array of blocks - find `type: 'text'` block and access `.text`
+  - ClaudeAPIError custom class with statusCode and isRetryable properties helps callers handle errors appropriately
+  - 429 (rate limit) and 5xx (server errors) should be marked as retryable; 401 (auth) should not
+  - Mock Anthropic.APIError in tests by creating object with `status` property and setting prototype to APIError.prototype
+  - LLM may return markdown code blocks despite instructions - always strip ```json...``` from responses
+  - Validate Song objects by checking title/artist are non-empty strings; filter out invalid songs from response
+---
+
+## 2026-01-15 - US-017
+- What was implemented: OpenAI LLM client for song generation
+- Files changed:
+  - src/lib/llm/openai.ts - OpenAIClient class with generateSongs() and generatePlaylistName() methods
+  - src/lib/llm/openai.test.ts - 25 tests covering song generation, name generation, and error handling
+- **Learnings for future iterations:**
+  - OpenAI SDK uses `chat.completions.create()` with model, max_tokens, temperature, and messages params
+  - Response structure: `response.choices[0].message.content` for the text content
+  - OpenAI uses `{ role: 'system', content }` in messages array instead of separate system param like Anthropic
+  - Check for `message.content === null || message.content === undefined` instead of `!message.content` to allow empty string handling
+  - Mock OpenAI.APIError in tests same way as Anthropic - create object with `status` property and set prototype
+  - Both clients follow same pattern: custom error class with statusCode/isRetryable, parseSongsResponse, isValidSong, handleError
+---
+
+## 2026-01-15 - US-018
+- What was implemented: LLM factory with provider selection
+- Files changed:
+  - src/lib/llm/index.ts - LLM factory module with getLLMClient(), getDefaultProvider(), LLMClient interface, LLMProvider type, and re-exports
+  - src/lib/llm/index.test.ts - 23 tests covering factory selection, client interface, default provider, and module exports
+- **Learnings for future iterations:**
+  - When re-exporting types with isolatedModules enabled, use `export type { X }` syntax for types and `export { Y }` for values
+  - Mock both @anthropic-ai/sdk and openai SDKs in factory tests to avoid API key validation errors in constructors
+  - LLMClient interface provides unified API across providers: generateSongs() and generatePlaylistName()
+  - getDefaultProvider() reads from LLM_DEFAULT_PROVIDER env var, defaults to 'claude' if not set or invalid
+---
+
+## 2026-01-15 - US-019
+- What was implemented: Song generation API endpoint
+- Files changed:
+  - src/app/api/generate/route.ts - POST handler for song generation with prompt/provider validation and LLM integration
+- **Learnings for future iterations:**
+  - Use `await request.json()` with try/catch to handle invalid JSON bodies gracefully
+  - Import both ClaudeAPIError and OpenAIAPIError from LLM factory to handle provider-specific errors
+  - Map LLM 401 errors to 500 for client (since it's a server config issue, not client auth)
+  - Map LLM 5xx errors to 502 (bad gateway) since the upstream LLM service failed
+  - Include `isRetryable` in error responses so client can show retry button appropriately
+---
+
+## 2026-01-15 - US-020
+- What was implemented: Playlist name suggestion API endpoint
+- Files changed:
+  - src/app/api/generate/suggest-name/route.ts - POST handler for playlist name suggestion with prompt/provider validation and LLM integration
+- **Learnings for future iterations:**
+  - Follow the established pattern from /api/generate/route.ts for consistent API design
+  - LLMClient interface already includes generatePlaylistName() method, so integration is straightforward
+  - Use same validation rules (10-5000 chars) for consistency across generate endpoints
+  - Error handling pattern with ClaudeAPIError and OpenAIAPIError is reusable across all LLM endpoints
+---
+
+## 2026-01-15 - US-021
+- What was implemented: SpotifyClient class with authenticated request handling
+- Files changed:
+  - src/lib/spotify/api.ts - SpotifyClient class with private fetch wrapper, HTTP methods (get/post/put/delete), and error handling
+  - src/lib/spotify/api.test.ts - 30 tests covering all HTTP methods, error scenarios, and edge cases
+- **Learnings for future iterations:**
+  - Use custom error classes (SpotifyAuthError, SpotifyRateLimitError, SpotifyAPIError) for typed error handling
+  - SpotifyRateLimitError includes `retryAfter` property from Retry-After header for backoff implementation
+  - SpotifyAPIError has `isRetryable` flag set to true for 5xx errors, false for 4xx errors
+  - Global fetch can be mocked in Jest by assigning to `global.fetch = jest.fn()`
+  - Handle 204 No Content responses by returning empty object (DELETE requests often return 204)
+  - Spotify error responses have structure `{ error: { message: string } }` - extract message from this path
+---
+
+## 2026-01-15 - US-022
+- What was implemented: Spotify track search with fuzzy matching
+- Files changed:
+  - src/lib/spotify/api.ts - Added searchTrack(title, artist) method and fuzzy matching utilities (normalizeString, levenshteinDistance, calculateSimilarity, fuzzyMatch)
+  - src/lib/spotify/api.test.ts - Added 34 tests for fuzzy matching utilities and searchTrack method
+- **Learnings for future iterations:**
+  - Use Levenshtein distance for calculating edit distance between strings (substitution, insertion, deletion)
+  - Normalize strings before matching: lowercase, remove accents (NFD + diacritics regex), remove punctuation
+  - Spotify search API accepts `track:title artist:artist` query format with `type=track` parameter
+  - When handling multi-artist tracks, check if ANY artist matches (using .some())
+  - Containment check (includes) catches cases where one string is a substring of another (e.g., "Dream" vs "Dream On")
+  - Default similarity threshold of 0.8 works well for common typos while avoiding false positives
+  - Import SpotifyTrack type from @/types to maintain consistency with the type system
+---
+
+## 2026-01-15 - US-023
+- What was implemented: Spotify search API endpoint for batch song searches
+- Files changed:
+  - src/app/api/spotify/search/route.ts - POST handler for searching multiple songs on Spotify with concurrency control
+- **Learnings for future iterations:**
+  - Use a simple executeWithConcurrency helper to limit parallel async operations (avoids rate limiting)
+  - SpotifySearchResult and SpotifySearchResponse types were already defined in @/types - reuse existing types
+  - Include both error code (AUTH_ERROR, RATE_LIMIT, SPOTIFY_ERROR) and message in error responses for better client handling
+  - Pass Retry-After header through from SpotifyRateLimitError for proper backoff in clients
+  - Validate each song in array individually to provide clear error messages with index
+---
+
+## 2026-01-15 - US-024
+- What was implemented: Spotify playlist API endpoint for creating and updating playlists
+- Files changed:
+  - src/app/api/spotify/playlist/route.ts - POST handler for creating playlists, PUT handler for updating existing playlists
+  - src/lib/spotify/api.ts - Added getCurrentUser(), createPlaylist(), addTracksToPlaylist(), removeTracksFromPlaylist() methods
+- **Learnings for future iterations:**
+  - Spotify requires user ID to create a playlist - use `/me` endpoint to get current user's ID first
+  - Spotify playlist API limits: name max 100 chars, description max 300 chars, max 100 tracks per add/remove request
+  - Use batch helper functions (addTracksInBatches, removeTracksInBatches) to handle large numbers of tracks
+  - Spotify track URIs have format `spotify:track:TRACKID` - validate with regex before sending to API
+  - When updating playlists, remove tracks first then add - avoids accidentally adding then removing same track
+  - The `delete` method for removing tracks requires body with `{ tracks: [{ uri }] }` format, not just URI strings
+  - Construct playlist URL manually for PUT responses: `https://open.spotify.com/playlist/${playlistId}`
+---
+
+## 2026-01-15 - US-025
+- What was implemented: Spotify recommendations API for "More Like This" feature
+- Files changed:
+  - src/lib/spotify/api.ts - Added getRecommendations(seedTrackId, limit) method
+  - src/lib/spotify/api.test.ts - Added 14 tests for getRecommendations method
+- **Learnings for future iterations:**
+  - Spotify recommendations API endpoint: `/recommendations?seed_tracks={trackId}&limit={limit}`
+  - The limit parameter is clamped to 1-100 range (Spotify's valid range), default 20
+  - The track ID should be URL encoded when constructing the query string
+  - Response structure: `{ tracks: SpotifyTrack[] }` - same SpotifyTrack type as search results
+  - The response may have null/undefined tracks property - always use `|| []` fallback
+---
+
+## 2026-01-15 - US-026
+- What was implemented: Playlist Zustand store for managing playlist state
+- Files changed:
+  - src/store/playlistStore.ts - Zustand store with playlist name, spotifyPlaylistId, isOwned, and songs state
+  - src/store/playlistStore.test.ts - 43 tests covering all actions and state transitions
+- **Learnings for future iterations:**
+  - PlaylistSong type uses SongState ('synced' | 'pending' | 'markedForRemoval') to track sync status
+  - generateSongId() creates unique IDs with timestamp + random string pattern: `song_${Date.now()}_${random}`
+  - loadSongs(songs, isOwned) replaces all songs - use this when loading existing playlists from Spotify
+  - addSongs(songs) appends songs with 'pending' state - use this when adding from candidates
+  - toggleRemoval only works on synced/markedForRemoval songs, not pending songs
+  - removePending only removes songs that are both matching ID AND in 'pending' state
+  - clearPlaylist resets all state including isOwned back to true (for "New Playlist" flow)
+  - markPendingAsSynced and removeMarkedSongs are helper methods for post-sync state updates
+---
+
+## 2026-01-15 - US-027
+- What was implemented: Candidate Zustand store for managing current generation candidates
+- Files changed:
+  - src/store/candidateStore.ts - Zustand store with candidates array, isLoading state, and all actions/selectors
+  - src/store/candidateStore.test.ts - 35 tests covering all actions and selectors
+- **Learnings for future iterations:**
+  - CandidateSong type from @/types includes isMatched and isSelected for managing selection state
+  - generateCandidateId() follows same pattern as playlist: `candidate_${Date.now()}_${random}`
+  - setCandidates replaces all candidates and sets isLoading to false - call setLoading(true) before starting generation
+  - toggleSelection only works on matched songs - unmatched songs cannot be selected
+  - selectAll and deselectAll are convenience methods for bulk selection operations
+  - getSelectedCandidates selector filters for both isMatched AND isSelected
+  - getMatchRate selector returns { matched, total, percentage } for display in UI
+  - Use standalone selector functions (not store methods) for derived data: `getSelectedCandidates(useCandidateStore.getState())`
+---
+
+## 2026-01-15 - US-028
+- What was implemented: usePlaylist hook for managing playlist with addSelectedToPlaylist functionality
+- Files changed:
+  - src/hooks/usePlaylist.ts - created hook with addSelectedToPlaylist, clearPlaylist, and selectors for hasPendingChanges/songCounts
+  - src/hooks/usePlaylist.test.ts - 22 tests covering all functionality
+- **Learnings for future iterations:**
+  - Candidate selector `getSelectedCandidates(state)` requires passing full state object { candidates, isLoading }
+  - When getting candidates from hook, use `useCandidateStore((state) => state.candidates)` to get reactive value
+  - addSongs from playlistStore requires spotifyTrack to be non-null, so filter candidates first
+  - clearPlaylist should clear both playlistStore and candidateStore for "New Playlist" flow
+  - songCounts helper provides counts by state (synced, pending, markedForRemoval, total) for UI display
+  - hasPendingChanges checks for any pending or markedForRemoval songs to determine if sync is needed
+---
+
+## 2026-01-15 - US-029
+- What was implemented: Session persistence in localStorage using Zustand persist middleware
+- Files changed:
+  - src/store/playlistStore.ts - added persist middleware with createJSONStorage, partialize config
+  - src/store/playlistStore.test.ts - added 8 tests for persistence behavior
+- **Learnings for future iterations:**
+  - Use `persist()` and `createJSONStorage()` from 'zustand/middleware' for localStorage persistence
+  - Wrap store creator with `create<Type>()()` (extra parens) when using middleware
+  - Use `partialize` option to specify which state properties to persist (exclude actions)
+  - Export storage key constant (PLAYLIST_STORAGE_KEY) for use in tests
+  - When testing persist, localStorage.setItem is called multiple times - use `.filter().pop()` to get LAST call with the storage key
+  - Use `usePlaylistStore.persist.rehydrate()` to trigger rehydration from mocked localStorage in tests
+  - Zustand persist stores data as `{ state: {...}, version: 0 }` structure
+---
+
+## 2026-01-15 - US-030
+- What was implemented: New Playlist flow wiring up UI to real stores
+- Files changed:
+  - src/app/page.tsx - converted to client component, wired up to usePlaylist hook and useCandidateStore
+  - src/components/layout/LeftPanel.tsx - changed playlistName prop from initialPlaylistName (uncontrolled) to controlled, added handleNewPlaylist to clear prompt
+- **Learnings for future iterations:**
+  - When converting page.tsx to use hooks, add 'use client' directive at the top
+  - For controlled form inputs, parent component provides value and onChange handler - no useState inside child
+  - usePlaylist hook's clearPlaylist() already clears both playlistStore and candidateStore
+  - LeftPanel needs to clear its own internal prompt state separately since it's local state
+  - The pattern of passing store actions as callbacks (onNewPlaylist, onPlaylistNameChange) keeps components reusable
+  - Browser verification confirmed: localStorage is properly updated when clearPlaylist is called
+---
+
+## 2026-01-15 - US-031
+- What was implemented: Added getUserPlaylists() method to SpotifyClient for fetching user's playlists
+- Files changed:
+  - src/lib/spotify/api.ts - added getUserPlaylists(limit) method with pagination support, added SpotifyPlaylistItem and SpotifyPlaylistsResponse interfaces
+  - src/lib/spotify/api.test.ts - added 18 tests for getUserPlaylists covering all scenarios
+  - src/types/index.ts - added UserPlaylist interface with id, name, owner, isOwned, images, and tracks fields
+- **Learnings for future iterations:**
+  - Spotify /me/playlists endpoint returns paginated results with max 50 items per request
+  - Use `next` property from response to determine if more pages are available
+  - Compare owner.id with current user's ID (from /me endpoint) to determine isOwned flag
+  - The response may have null values for images, tracks, display_name - always use fallbacks (|| [] or || 0)
+  - When testing multiple sequential fetch calls, use mockFetch.mockReset() in beforeEach for proper isolation
+  - Use chained .mockResolvedValueOnce() calls for tests that make multiple sequential API requests
+---
+
+## 2026-01-15 - US-032
+- What was implemented: Added getPlaylistTracks() method to SpotifyClient for fetching tracks from an existing playlist
+- Files changed:
+  - src/lib/spotify/api.ts - added getPlaylistTracks(playlistId, limit) method with pagination support, added SpotifyPlaylistTrackItem and SpotifyPlaylistTracksResponse interfaces
+  - src/lib/spotify/api.test.ts - added 15 tests for getPlaylistTracks covering all scenarios
+- **Learnings for future iterations:**
+  - Spotify /playlists/{id}/tracks endpoint returns paginated results with max 100 items per request
+  - The response items have a `track` property that can be null (for deleted/unavailable tracks) - always check for null before adding to results
+  - Use `next` property from response to determine if more pages are available
+  - Response structure: `{ items: [{ track: SpotifyTrack | null, added_at, added_by }], next, ... }`
+  - Pagination pattern similar to getUserPlaylists but with 100 max per page instead of 50
+---
+
+## 2026-01-15 - US-033
+- What was implemented: Load Existing Playlist flow - dropdown to select user's playlists, fetch tracks from Spotify, populate right panel
+- Files changed:
+  - src/app/api/spotify/playlists/route.ts - created GET endpoint to fetch user's playlists with accessToken query param
+  - src/app/api/spotify/playlists/[playlistId]/tracks/route.ts - created GET endpoint to fetch playlist tracks
+  - src/components/layout/LeftPanel.tsx - updated dropdown to show playlists with track count and lock icon for followed
+  - src/app/page.tsx - added fetchUserPlaylists on auth, handleLoadExisting to load tracks and populate store
+- **Learnings for future iterations:**
+  - Next.js 16 dynamic route params are async - use `const { playlistId } = await params` in route handlers
+  - Pass accessToken via query params for GET requests (can't use body)
+  - Convert SpotifyTrack to Song format: title=name, artist=artists.map(...).join(', '), album=album.name
+  - For followed (read-only) playlists: clear playlist ID, clear name, songs get 'pending' state (loadSongs with isOwned=false)
+  - For owned playlists: set playlist ID, set name, songs get 'synced' state (loadSongs with isOwned=true)
+---
+
+## 2026-01-15 - US-034
+- What was implemented: Verified read-only playlist handling (implementation was already in place from US-033)
+- Files changed: None (all implementation was part of US-033)
+- **Verification results:**
+  - Read-only banner: Shows "This playlist is read-only. Changes will create a new playlist." with lock icon in amber/yellow
+  - Songs state: All songs show + icon (pending) instead of music note (synced)
+  - Playlist name: Cleared to empty for user to enter new name
+  - Button label: Shows "Create Playlist" instead of "Update Playlist"
+  - Contrast verified: Owned playlists show synced icons, playlist name, and "Update Playlist" button
+- **Learnings for future iterations:**
+  - US-033 and US-034 could have been combined - the read-only handling was naturally part of the Load Existing flow
+  - The `isOwned` flag in playlistStore drives both the song state (synced vs pending) and UI elements (banner, button label)
+  - Browser testing via dev-browser skill can use localStorage manipulation to simulate different playlist states without needing real Spotify auth
+---
+
+## 2026-01-15 - US-035
+- What was implemented: Song generation flow end-to-end wiring
+- Files changed:
+  - src/app/page.tsx - added handleSuggestSongs function, wired up onSuggestSongs and isGenerating props to LeftPanel
+- **Verification results:**
+  - Prompt textarea validates min 10 characters
+  - Suggest songs button enabled when prompt is valid
+  - Button disabled and shows loading state during generation
+  - Calls /api/generate with prompt and selected LLM provider
+  - On success, calls /api/spotify/search with generated songs
+  - Sets candidates in candidateStore for MiddlePanel display
+  - Error handling logs failures and resets loading state
+- **Learnings for future iterations:**
+  - The LeftPanel already had isGenerating and onSuggestSongs props defined from US-011 - just needed to wire them up
+  - candidateStore.setCandidates automatically sets isLoading to false - don't need to call it manually after setting candidates
+  - For browser testing without API keys, the flow still works but fails quickly at the LLM API call - skeleton loader shows briefly
+  - LLMProvider type already exists in @/types - use it for type safety in the handler
+---
+
+## 2026-01-15 - US-036
+- What was implemented: Verified Add Selected to playlist flow is working end-to-end
+- Files changed: None (implementation was completed in US-028 and US-030)
+- **Verification results:**
+  - CandidateList component has checkboxes with onToggleSelection callback
+  - "Add Selected (X)" button shows count and calls onAddSelected when clicked
+  - handleAddSelected in page.tsx calls addSelectedToPlaylist() from usePlaylist hook
+  - addSelectedToPlaylist() moves selected candidates to playlist store with 'pending' state
+  - deselectAll() is called after adding to clear selections in middle panel
+  - 22 tests in usePlaylist.test.ts verify all functionality including edge cases
+  - Typecheck passes
+  - Browser verification shows UI components are properly connected
+- **Learnings for future iterations:**
+  - US-036 acceptance criteria were already implemented by US-028 (usePlaylist hook with addSelectedToPlaylist) and US-030 (wiring page.tsx to stores)
+  - When a user story's functionality is already implemented by previous stories, the story becomes a verification checkpoint
+  - The usePlaylist.test.ts file provides comprehensive coverage of the add-selected flow including: adding selected candidates, clearing selections, filtering unmatched songs, handling empty selections
+---
+
+## 2026-01-15 - US-037
+- What was implemented: Create Playlist flow to create new Spotify playlists
+- Files changed:
+  - src/app/page.tsx - Added handleCreatePlaylist function, handleSave wrapper, success message state, and UI for success banner with Spotify link
+- **Implementation details:**
+  - handleCreatePlaylist() collects pending songs' URIs, calls POST /api/spotify/playlist, and on success:
+    - Stores the new playlistId via setPlaylistId()
+    - Marks pending songs as synced via markPendingAsSynced()
+    - Sets isOwned to true
+    - Shows success message banner with "Open in Spotify" link
+  - handleSave() wrapper function decides between create (US-037) and update (US-038) based on spotifyPlaylistId existence
+  - Success message is dismissible and appears in the header
+  - Button label automatically changes from "Create Playlist" to "Update Playlist" after creation (via hasSpotifyPlaylist && isOwned check in PlaylistView)
+- **Learnings for future iterations:**
+  - The PlaylistView component already had onSave and isSaving props defined - just needed to wire them up from page.tsx
+  - Use useCallback for handlers that are passed as props to avoid unnecessary re-renders
+  - Success message pattern: use state object with message and URL, render banner in header area
+  - handleSave wrapper allows progressive implementation - US-037 handles create, US-038 will add update logic to same entry point
+---
+
+## 2026-01-15 - US-038
+- What was implemented: Update Playlist flow for updating existing Spotify playlists
+- Files changed:
+  - src/app/page.tsx - Added handleUpdatePlaylist function, connected removeMarkedSongs from playlistStore, updated handleSave to route to update flow
+- **Implementation details:**
+  - handleUpdatePlaylist() collects pending songs' URIs (to add) and markedForRemoval songs' URIs (to remove)
+  - Calls PUT /api/spotify/playlist with playlistId, addUris, and removeUris
+  - On success: calls markPendingAsSynced() to change pending to synced, calls removeMarkedSongs() to remove markedForRemoval songs
+  - Shows success message banner with "Playlist updated successfully!" and link to Spotify
+  - handleSave() wrapper now routes to handleUpdatePlaylist when spotifyPlaylistId exists and isOwned is true
+- **Learnings for future iterations:**
+  - The PUT endpoint was already implemented in US-024 - just needed to wire it up from the frontend
+  - playlistStore already had markPendingAsSynced() and removeMarkedSongs() methods from US-026 - just needed to use them
+  - Browser verification using localStorage manipulation is effective for testing different song states without needing real Spotify auth
+  - The song state icons (synced/pending/markedForRemoval) properly display in the UI, confirming the PlaylistView component works correctly
+---
+
+## 2026-01-15 - US-039
+- What was implemented: Playlist name conflict detection and resolution dialog
+- Files changed:
+  - src/components/features/playlist/NameConflictDialog.tsx - New dialog component with three resolution options
+  - src/components/features/playlist/index.ts - Added export for NameConflictDialog and ConflictResolution type
+  - src/app/page.tsx - Added conflict detection and resolution handlers, refactored playlist creation flow
+- **Implementation details:**
+  - NameConflictDialog shows when user tries to create a playlist with a name that already exists (case-insensitive match)
+  - Three options: "Add new songs to it" (append to existing), "Replace its current contents" (clear and add), "Create with different name" (shows name input)
+  - findConflictingPlaylist() checks userPlaylists for name matches (only owned playlists)
+  - createPlaylistOnSpotify() extracted for reuse across different resolution paths
+  - addSongsToExistingPlaylist() adds tracks to an existing playlist
+  - replacePlaylistContents() removes all tracks then adds new ones
+  - finalizePlaylistCreation() updates store state and shows success message
+  - handleConflictResolution() routes to appropriate action based on user's choice
+- **Learnings for future iterations:**
+  - The NameConflictDialog returns nothing when isOpen=false, so it doesn't affect the DOM when hidden
+  - For testing UI components without API access, create a test page that mounts the component in isolation
+  - The conflict detection only checks owned playlists since followed playlists can't be modified anyway
+  - ConflictResolution type uses discriminated unions (type: 'add-to-existing' | 'replace-contents' | 'use-different-name' | 'cancel') for type-safe resolution handling
+---
+
+## 2026-01-15 - US-040
+- What was implemented: Verified toggle removal in right panel is already working (implementation from previous stories)
+- Files changed: None (implementation was already complete)
+- **Verification results:**
+  - handleSongClick() in page.tsx (lines 170-179) correctly handles:
+    - Synced songs → calls toggleRemoval() to mark as markedForRemoval
+    - MarkedForRemoval songs → calls toggleRemoval() to restore to synced
+    - Pending songs → calls removePending() to remove entirely from playlist
+  - toggleRemoval() in playlistStore.ts toggles between synced ↔ markedForRemoval states
+  - removePending() in playlistStore.ts removes only songs that are pending state
+  - SongCard displays appropriate icons:
+    - Green music note for synced
+    - Blue plus for pending
+    - Red forbidden symbol for markedForRemoval
+  - PlaylistView passes isClickable and onSongClick to all song cards
+  - All 342 tests pass including specific tests for toggleRemoval and removePending
+  - Typecheck passes
+- **Learnings for future iterations:**
+  - When acceptance criteria are already implemented by previous stories, the story becomes a verification checkpoint
+  - The toggle removal functionality was naturally implemented as part of US-026 (playlistStore), US-028 (usePlaylist hook), and US-030 (wiring page.tsx)
+  - Test coverage is comprehensive: toggleRemoval tests synced→markedForRemoval, markedForRemoval→synced, no effect on pending, only specified song affected
+---
+
+## 2026-01-15 - US-041
+- What was implemented: Drag and drop from middle panel (candidates) to right panel (playlist)
+- Files changed:
+  - src/components/features/playlist/CandidateList.tsx - Added CANDIDATE_DRAG_TYPE constant, draggable attribute on matched songs, onDragStart handler, cursor-grab styling, and drag handle icon (6-dot grip)
+  - src/components/features/playlist/PlaylistView.tsx - Added isDragOver state, drop zone handlers (handleDragOver, handleDragEnter, handleDragLeave, handleDrop), visual blue highlight on dragover, updated empty state to support drop
+  - src/components/features/playlist/index.ts - Added CANDIDATE_DRAG_TYPE export
+  - src/components/layout/RightPanel.tsx - Added onCandidateDrop prop and passed it through to PlaylistView
+  - src/app/page.tsx - Added handleCandidateDrop callback that finds candidate by ID and adds to playlist
+- **Learnings for future iterations:**
+  - Use custom MIME type (application/x-candidate-song) for drag data transfer to avoid conflicts with other drag operations
+  - handleDragLeave needs relatedTarget check to avoid false negatives when moving between parent and child elements
+  - The candidateStore does not persist to localStorage (unlike playlistStore), so test data injection via localStorage doesn't work for candidates
+  - Matched songs are draggable (draggable={candidate.isMatched}), unmatched songs cannot be dragged
+  - PlaylistView handles both empty state and populated state drop zones with same handlers
+---
+
+## 2026-01-15 - US-042
+- What was implemented: Drag and drop reordering within right panel (playlist)
+- Files changed:
+  - src/store/playlistStore.ts - Added reorderSong(fromIndex, toIndex) action that moves a song from one position to another
+  - src/store/playlistStore.test.ts - Added 11 tests for reorderSong covering edge cases (negative indices, out of bounds, same index, adjacent positions, state preservation)
+  - src/components/features/playlist/PlaylistView.tsx - Added PLAYLIST_SONG_DRAG_TYPE constant, draggable wrapper divs with drag handlers, 6-dot grip handle icon, drop position indicator (blue line with dots), opacity feedback on dragged song
+  - src/components/features/playlist/index.ts - Added PLAYLIST_SONG_DRAG_TYPE export
+  - src/components/layout/RightPanel.tsx - Added onReorder prop and passed through to PlaylistView
+  - src/app/page.tsx - Added reorderSong action from store and passed it to RightPanel as onReorder
+- **Learnings for future iterations:**
+  - Use `draggable={!!onReorder}` not just `draggable` - in JSX, `draggable` without a value becomes draggable="" which browsers treat as false
+  - Use different MIME types for different drag operations (PLAYLIST_SONG_DRAG_TYPE vs CANDIDATE_DRAG_TYPE) to distinguish between reorder and add operations
+  - The drop position indicator shows a blue horizontal line with circles at each end to indicate where the song will be inserted
+  - Song state (synced, pending, markedForRemoval) is preserved during reordering
+  - Array reordering: splice(fromIndex, 1) removes and returns the item, then splice(toIndex, 0, item) inserts it at the new position
+---
+
+## 2026-01-15 - US-043
+- What was implemented: Drag from right panel to middle panel for song removal
+- Files changed:
+  - src/components/layout/MiddlePanel.tsx - Added drop handlers at panel wrapper level, isDragOver state, red visual drop zone indicator with trash icon and "Drop to remove from playlist" message
+  - src/components/features/playlist/CandidateList.tsx - Added PLAYLIST_SONG_DRAG_TYPE drop handling alongside existing empty state handlers
+  - src/components/features/playlist/PlaylistView.tsx - Updated drag data format from just index to "index:songId" to support both reordering (uses index) and removal (uses songId)
+  - src/app/page.tsx - Added handlePlaylistSongDrop callback that toggles removal for synced songs or removes pending songs entirely
+- **Learnings for future iterations:**
+  - Store multiple values in dataTransfer using a formatted string like "index:songId" - parse with split(':')
+  - Playwright cannot properly simulate HTML5 drag and drop with DataTransfer - synthetic DragEvents don't expose dataTransfer.types to handlers
+  - The click-to-toggle-removal functionality uses the same store actions (toggleRemoval, removePending) so testing click behavior validates the same logic
+  - Drop handlers need to be on the outermost container div to capture drops anywhere in the panel, not just on child components
+  - Red color scheme (bg-red-50, border-red-400, text-red-700) for destructive drop actions vs blue for constructive
+---
+
+## 2026-01-15 - US-044
+- What was implemented: "More Like This" feature to get similar song recommendations
+- Files changed:
+  - src/app/api/spotify/recommendations/route.ts - New POST endpoint that calls SpotifyClient.getRecommendations with seedTrackId
+  - src/store/candidateStore.ts - Added insertCandidatesAfter action that inserts songs after a specific candidate, auto-selecting matched songs
+  - src/store/candidateStore.test.ts - Added 6 tests for insertCandidatesAfter (ordering, auto-selection, unique IDs, edge cases)
+  - src/components/features/playlist/SongCard.tsx - Added MoreLikeThisButton component (refresh icon), onMoreLikeThis and spotifyTrackId props
+  - src/components/features/playlist/CandidateList.tsx - Added inline "More Like This" button for matched candidates
+  - src/components/features/playlist/PlaylistView.tsx - Added onMoreLikeThis prop, passed to SongCard with spotifyTrackId
+  - src/components/layout/MiddlePanel.tsx - Added onMoreLikeThis prop pass-through
+  - src/components/layout/RightPanel.tsx - Added onMoreLikeThis prop pass-through
+  - src/app/page.tsx - Added handleMoreLikeThis, handleMoreLikeThisFromCandidate, handleMoreLikeThisFromPlaylist callbacks
+- **Learnings for future iterations:**
+  - Use insertCandidatesAfter with auto-selection for "More Like This" to immediately make recommendations actionable
+  - For candidates: insert after source song so user can see context
+  - For playlist songs: insert at beginning of candidates (prepend) since there's no direct source in candidates
+  - The refresh/circular arrows icon is a common UX pattern for "get similar items"
+  - Always show button conditionally: `onMoreLikeThis && spotifyTrackId && isMatched` ensures it only appears when functional
+  - Next.js dev server caches aggressively - sometimes need to clear .next and restart for component changes
+---
+
+## 2026-01-16 - US-045
+- What was implemented: Song tagging UI for marking songs to generate prompts from
+- Files changed:
+  - src/store/tagStore.ts - New Zustand store with toggleTag, isTagged, clearTags actions, and getTaggedCount/getTaggedSongs selectors
+  - src/store/tagStore.test.ts - 18 tests covering all actions and selectors
+  - src/components/features/playlist/SongCard.tsx - Added TagButton component (tag icon), onToggleTag and isTagged props, amber styling for tagged state
+  - src/components/features/playlist/CandidateList.tsx - Added tag button in action buttons group, amber border/background for tagged songs
+  - src/components/features/playlist/PlaylistView.tsx - Added onToggleTag and isTagged props, passed to SongCard
+  - src/components/layout/MiddlePanel.tsx - Added onToggleTag and isTagged props pass-through
+  - src/components/layout/RightPanel.tsx - Added onToggleTag and isTagged props pass-through
+  - src/app/page.tsx - Added useTagStore import, toggleTag and isTagged from store, passed to both panels
+- **Learnings for future iterations:**
+  - Separate tag store makes sense since tags work across both candidates (middle) and playlist (right) panels
+  - TaggedSong stores both spotifyTrackId and Song object for future prompt generation
+  - Amber color scheme (bg-amber-50, border-amber-300) provides good visual distinction from other states
+  - Tag icon (label/tag shape) with fill when tagged, outline when not, is intuitive UX
+  - 18 tests for tagStore cover: toggle on/off, multiple tags, isTagged check, clearTags, and selectors
+---
+
+## 2026-01-16 - US-046
+- What was implemented: Generate Prompt From Tagged feature
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added taggedCount and onGenerateFromTags props, "Generate Prompt from X Tagged Songs" button with tag icon
+  - src/app/page.tsx - Added handleGenerateFromTags callback, taggedCount from store, clearTags action, passed props to LeftPanel
+- **Learnings for future iterations:**
+  - Return value from callback pattern (onGenerateFromTags returns string) allows parent to compute value and child to consume it
+  - Button with dynamic count ("from 3 Tagged Songs") provides good UX feedback
+  - Format "Songs similar to [Song] by [Artist], ..." works well for LLM prompts
+  - clearTags() after generation ensures clean slate for next tagging session
+  - User can edit the generated prompt before clicking "Suggest songs" (editable textarea)
+---
+
+## 2026-01-16 - US-047
+- What was implemented: Auto-update prompt when tags change
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added isPromptFromTags state, lastTagCountRef, useEffect for tag changes, handlePromptChange to detect manual edits, moved generatePromptFromTags logic here
+  - src/app/page.tsx - Removed handleGenerateFromTags (moved to LeftPanel), pass taggedSongs and onClearTags instead of taggedCount and onGenerateFromTags
+- **Learnings for future iterations:**
+  - Moving prompt generation logic to LeftPanel provides better encapsulation since that's where prompt state lives
+  - useEffect watching taggedSongs array regenerates prompt when isPromptFromTags is true
+  - lastTagCountRef prevents infinite loops by tracking previous tag count
+  - Manual edit detection: any onChange on textarea sets isPromptFromTags = false
+  - Clear prompt when all tags removed (taggedSongs.length === 0 && isPromptFromTags)
+---
+
+## 2026-01-16 - US-048
+- What was implemented: Verified skeleton loaders already implemented in US-012 and US-013
+- Files changed: None (skeleton loaders were already in place)
+- **Verification results:**
+  - MiddlePanel.tsx (lines 125-145): Shows 6 skeleton cards with animate-pulse during isLoading state
+    - Skeleton header bar (h-4 w-48)
+    - 6 skeleton song cards with checkbox placeholder, title bar (h-4 w-3/4), and artist bar (h-3 w-1/2)
+  - RightPanel.tsx (lines 55-75): Shows 6 skeleton cards with animate-pulse during isLoading state
+    - Skeleton count bar (h-4 w-24)
+    - 6 skeleton song cards with icon placeholder, title bar, and artist bar
+  - Both use Tailwind's animate-pulse class for smooth loading animation
+  - Conditional rendering (isLoading ? skeleton : actual content) provides smooth transition
+- **Learnings for future iterations:**
+  - Skeleton loaders were naturally implemented as part of the panel components (US-012, US-013) before the explicit user story
+  - When implementing component loading states, skeleton loaders should be included from the start
+  - The animate-pulse class in Tailwind CSS provides a subtle, professional loading effect
+---
+
+## 2026-01-16 - US-049
+- What was implemented: Streaming song results display using Server-Sent Events (SSE)
+- Files changed:
+  - src/app/api/spotify/search/stream/route.ts - New SSE endpoint for streaming Spotify search results
+  - src/store/candidateStore.ts - Added initCandidates and updateCandidate actions for streaming support
+  - src/store/candidateStore.test.ts - Added 8 tests for new streaming actions
+  - src/types/index.ts - Added optional isSearching field to CandidateSong interface
+  - src/components/features/playlist/CandidateList.tsx - Added individual loading indicators for searching songs
+  - src/app/page.tsx - Updated handleSuggestSongs to use streaming endpoint
+- **Implementation details:**
+  - SSE endpoint sends 'result' events as each Spotify search completes
+  - initCandidates(songs) creates placeholder candidates with isSearching=true
+  - updateCandidate(index, spotifyTrack) updates individual candidate when search completes
+  - CandidateList shows spinning indicator instead of checkbox for searching songs
+  - Match rate header shows "Searching... X of Y checked (N found)" during streaming
+  - Songs with isSearching=true have "Searching..." badge and animate-pulse effect
+  - Users can select completed songs while others are still searching
+- **Learnings for future iterations:**
+  - SSE (Server-Sent Events) is ideal for streaming multiple results back to client
+  - Use `event: type\ndata: json\n\n` format for SSE messages
+  - Track individual search completion with isSearching flag per candidate
+  - Store's isLoading automatically becomes false when all candidates finish searching
+  - Concurrency control (5 parallel requests) prevents overwhelming Spotify API
+---
+
+## 2026-01-16 - US-050
+- What was implemented: Cancel generation button with AbortController support
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added onCancelGeneration prop, shows "Cancel Generation" button during isGenerating
+  - src/store/candidateStore.ts - Added cancelSearching action to mark all searching candidates as not-searching
+  - src/store/candidateStore.test.ts - Added 3 tests for cancelSearching action
+  - src/app/page.tsx - Added useRef for AbortController, handleCancelGeneration callback, pass signal to fetch calls
+- **Implementation details:**
+  - LeftPanel shows "Cancel Generation" button (secondary variant with X icon) when isGenerating is true
+  - AbortController created at start of handleSuggestSongs, stored in abortControllerRef
+  - Both /api/generate and /api/spotify/search/stream fetch calls receive abort signal
+  - When cancelled, AbortError is caught and generation stops gracefully
+  - cancelSearching marks all isSearching candidates as isSearching: false, keeps already-found songs
+  - The cancel button replaces the "Suggest songs" button during generation
+- **Learnings for future iterations:**
+  - AbortController is the standard way to cancel fetch requests
+  - AbortError has name === 'AbortError', check this to distinguish from real errors
+  - Store the AbortController in a ref so it persists across renders
+  - Clean up ref (set to null) when generation completes or is cancelled
+  - Keep found songs when cancelling - user may want to use partial results
+---
+
+## 2026-01-16 - US-051
+- What was implemented: Added playlist name auto-suggestion after first generation
+- Files changed:
+  - src/app/page.tsx - Added suggestedName state, hasGeneratedRef to track first generation, calls /api/generate/suggest-name after successful streaming completion, uses suggested name in handleCreatePlaylist fallback
+  - src/components/layout/LeftPanel.tsx - Added suggestedName prop, shows as placeholder in name input, displays hint text when suggested name available
+- **Learnings for future iterations:**
+  - Fire-and-forget async calls can be done with .then().catch() chains without awaiting
+  - useRef is useful for tracking one-time flags that should not trigger re-renders
+  - suggestedName can be used as a fallback in the save logic without requiring the user to explicitly accept it
+---
+
+
+## 2026-01-16 - US-052
+- What was implemented: Added active playlist indicator in header
+- Files changed:
+  - src/app/page.tsx - Added isHydrated state and useEffect for SSR/CSR hydration handling, added green pill indicator with Spotify icon next to title that links to playlist
+- **Learnings for future iterations:**
+  - Zustand persist middleware causes SSR/CSR mismatch - initial server render has empty store state
+  - Use isHydrated state pattern: `const [isHydrated, setIsHydrated] = useState(false); useEffect(() => setIsHydrated(true), []);`
+  - Only render hydration-dependent content when isHydrated is true
+  - Spotify playlist URLs follow format: https://open.spotify.com/playlist/{playlistId}
+---
+
+
+## 2026-01-16 - US-059
+- What was implemented: CSRF protection for write endpoints using double-submit cookie pattern
+- Files changed:
+  - src/lib/csrf.ts - New CSRF token generation and validation utilities (generateCSRFToken, setCSRFCookies, clearCSRFCookies, validateCSRFToken)
+  - src/lib/csrf-client.ts - Client-side CSRF utilities (getCSRFToken, createHeadersWithCSRF, fetchWithCSRF)
+  - src/lib/csrf.test.ts - 15 tests for CSRF utilities
+  - src/app/api/auth/spotify/callback/route.ts - Generate and set CSRF token on successful OAuth
+  - src/app/api/auth/refresh/route.ts - Ensure CSRF token exists on token refresh (backward compatibility)
+  - src/app/api/spotify/playlist/route.ts - Validate CSRF token on POST and PUT handlers, return 403 on invalid token
+  - src/app/page.tsx - Use createHeadersWithCSRF for all /api/spotify/playlist requests
+- **Learnings for future iterations:**
+  - Double-submit cookie pattern: httpOnly cookie for server validation, non-httpOnly cookie for client access
+  - Use timing-safe string comparison (XOR loop) to prevent timing attacks on token validation
+  - CSRF token header name convention: x-csrf-token
+  - Generate CSRF token on both OAuth callback AND token refresh for backward compatibility with existing sessions
+  - Frontend utility createHeadersWithCSRF merges CSRF token with other headers for easy integration
+  - process.env.NODE_ENV is read-only in TypeScript strict mode - test secure flag based on current env value instead of modifying
+---
+
+## 2026-01-16 - US-060
+- What was implemented: CSP headers and security settings in next.config.ts
+- Files changed:
+  - next.config.ts - Added async headers() function with comprehensive security headers
+- **Security headers added:**
+  - Content-Security-Policy with:
+    - default-src 'self'
+    - script-src 'self' 'unsafe-inline' 'unsafe-eval' (required for Next.js)
+    - style-src 'self' 'unsafe-inline' (required for Tailwind)
+    - img-src 'self' + Spotify CDN domains + data: + blob:
+    - font-src 'self'
+    - connect-src 'self' + Spotify API + LLM APIs (Anthropic, OpenAI)
+    - form-action 'self'
+    - frame-ancestors 'none'
+    - base-uri 'self'
+    - require-trusted-types-for 'script' (Trusted Types enabled)
+  - X-Frame-Options: DENY
+  - X-Content-Type-Options: nosniff
+  - X-XSS-Protection: 1; mode=block
+  - Referrer-Policy: strict-origin-when-cross-origin
+  - Strict-Transport-Security: max-age=31536000; includeSubDomains
+  - Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+- **Learnings for future iterations:**
+  - Next.js uses async headers() function in next.config.ts for custom HTTP headers
+  - Source pattern "/:path*" applies headers to all routes
+  - CSP requires 'unsafe-inline' and 'unsafe-eval' for Next.js/React hydration
+  - Spotify uses multiple CDN domains for images: i.scdn.co, image-cdn-ak.spotifycdn.com, image-cdn-fa.spotifycdn.com
+  - frame-ancestors 'none' in CSP is redundant with X-Frame-Options: DENY but provides defense-in-depth
+  - Trusted Types enabled with require-trusted-types-for 'script' helps prevent DOM XSS
+---
+
+## 2026-01-16 - US-061
+- What was implemented: Wired up main page with all components, auth initialization, and login prompt for unauthenticated users
+- Files changed:
+  - src/app/page.tsx - Changed from useAuthStore to useSpotifyAuth hook for auto-refresh on mount, added showLoginPrompt condition, added login prompt overlay
+- **Implementation details:**
+  - Login prompt overlay shows when: isHydrated && !isAuthLoading && !isAuthenticated
+  - Overlay includes: Spotify logo, "Welcome to AI Playlist Generator" heading, app description, feature highlights (AI-Powered Suggestions, Direct Spotify Integration), "Log in with Spotify" button, permission note
+  - Uses backdrop-blur-sm and bg-gray-900/50 for dimmed background effect
+  - All stores remain connected: playlistStore, candidateStore, tagStore, authStore (via useSpotifyAuth hook)
+  - Auth status shown in header: SpotifyLoginButton when not authenticated, AuthStatus when authenticated
+- **Learnings for future iterations:**
+  - useSpotifyAuth hook triggers auth refresh on mount via useEffect - using this hook instead of direct store access ensures proper initialization
+  - When multiple components use useSpotifyAuth, the hasAttemptedRefresh flag prevents duplicate API calls
+  - Auth state transitions: isAuthLoading starts false → becomes true during refresh → becomes false when complete
+  - The showLoginPrompt condition must wait for both hydration AND auth check completion to avoid flicker
+  - Trusted Types CSP policy (require-trusted-types-for 'script') causes console errors in dev mode but doesn't break React rendering
+---
+
+## 2026-01-16 - US-062
+- What was implemented: Search results caching to reduce Spotify API calls
+- Files changed:
+  - src/store/searchCacheStore.ts - New Zustand store with cache Map, getCached/setCache/has/clearCache actions, generateCacheKey helper
+  - src/store/searchCacheStore.test.ts - 23 tests covering cache hit/miss, normalized keys, invalidation
+  - src/app/page.tsx - Updated handleSuggestSongs to check cache before API call, cache results on receive, map stream index back to original index
+  - src/hooks/usePlaylist.ts - Added useSearchCacheStore import, clearCache call in clearPlaylist action
+  - src/hooks/usePlaylist.test.ts - Added test for cache clearing on clearPlaylist
+- **Learnings for future iterations:**
+  - Separate cache store (not in candidateStore) keeps concerns separated and is clearer
+  - Cache key normalization: lowercase, trim, remove diacritics (NFD + regex), remove punctuation, collapse whitespace
+  - When caching is added to a streaming flow, must map stream indices back to original indices if only subset of items are sent to API
+  - Cache entry includes timestamp (cachedAt) for potential future TTL implementation
+  - Client-side caching is simpler than server-side - no need to modify API routes, just check cache before calling
+  - The `uncachedSongs` array stores both original index and song, allowing proper index mapping when results return
+---
+
+## 2026-01-16 - US-063
+- What was implemented: Exponential backoff for Spotify rate limiting and server errors
+- Files changed:
+  - src/lib/spotify/backoff.ts - New module with BackoffConfig, calculateBackoffDelay, calculateDelayWithRetryAfter, getBackoffResult, delay, withBackoff
+  - src/lib/spotify/backoff.test.ts - 42 tests for all backoff functions with mocked timers
+  - src/lib/spotify/api.ts - Updated SpotifyClient with SpotifyClientOptions, backoff integration in fetch wrapper, extractRetryAfter helper
+  - src/lib/spotify/api.test.ts - Updated existing tests to use enableRetries: false, added 22 tests for backoff behavior
+- **Learnings for future iterations:**
+  - Use `jest.useFakeTimers()` and `jest.runAllTimersAsync()` for testing async functions with delays
+  - When testing promise rejections with fake timers, use `.catch()` to capture the error before running timers
+  - Exponential backoff formula: min(maxDelay, baseDelay * 2^attempt) + jitter
+  - SpotifyClient now accepts options parameter for configuring backoff and enabling/disabling retries
+  - Default backoff config: maxRetries=3, baseDelayMs=1000, maxDelayMs=30000, jitterFactor=0.1
+  - Existing tests need `enableRetries: false` to preserve their original behavior (immediate error on failure)
+  - Retry logic only applies to 429 (rate limit) and 5xx (server errors), not 4xx client errors
+  - The condition `attempt > maxRetries` (not `>=`) allows the full number of retries to occur
+---
+
+## 2026-01-16 - US-064
+- What was implemented: Removed Trusted Types CSP directive for Next.js compatibility
+- Files changed:
+  - next.config.ts - Removed 'require-trusted-types-for script' from Content-Security-Policy header
+- **Learnings for future iterations:**
+  - Next.js dynamically injects script elements for code splitting and hot reload without using the Trusted Types API
+  - The 'require-trusted-types-for script' CSP directive causes 'TrustedScriptURL assignment' errors that break Next.js page loading
+  - Other CSP directives like frame-ancestors 'none', default-src 'self', script-src restrictions remain effective for security
+  - Browser verification showed 401 errors on /api/auth/refresh are expected (no Spotify session) - not related to CSP
+---
+
+## 2026-01-16 - US-065
+- What was implemented: Created .env.local from .env.local.example template
+- Files changed:
+  - .env.local - Created (not tracked by git) with placeholder values for Spotify OAuth and LLM API keys
+- **Learnings for future iterations:**
+  - .env.local is intentionally gitignored (matches `.env*` pattern in .gitignore)
+  - This user story is unique in that it creates a local file that should NOT be committed
+  - The file existence can be verified with `git check-ignore .env.local`
+  - App starts correctly and shows "Environments: .env.local" confirming Next.js reads the file
+  - No commit needed for this story since .env.local is a local development file
+---
+
+## 2026-01-16 - US-066
+- What was implemented: Added comprehensive setup documentation to README.md
+- Files changed:
+  - README.md - Complete rewrite with project overview, features, prerequisites, setup instructions, usage guide, development scripts, and troubleshooting
+- **Learnings for future iterations:**
+  - README.md already existed with placeholder content, so this was a content update rather than new file creation
+  - Emphasized using 127.0.0.1 instead of localhost for Spotify OAuth redirect URIs - this is a common gotcha
+  - Environment variables table format with Required/Description columns provides clear documentation
+  - Step-by-step setup instructions should include both Spotify Developer App creation and LLM API key acquisition
+  - Including a "Troubleshooting" section for common issues saves users time
+---
