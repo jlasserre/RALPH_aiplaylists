@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { generateCSRFToken, setCSRFCookies, CSRF_COOKIE_NAME } from '@/lib/csrf';
 
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
@@ -32,6 +33,16 @@ export async function POST() {
   if (existingAccessToken) {
     // Return the existing token - client will store it in memory
     // The cookie will naturally expire based on its maxAge
+    // Check if CSRF token exists, generate one if not (for backward compatibility)
+    const existingCsrfToken = cookieStore.get(CSRF_COOKIE_NAME)?.value;
+    if (!existingCsrfToken) {
+      const response = NextResponse.json({
+        access_token: existingAccessToken,
+      });
+      const csrfToken = generateCSRFToken();
+      setCSRFCookies(csrfToken, response);
+      return response;
+    }
     return NextResponse.json({
       access_token: existingAccessToken,
     });
@@ -109,6 +120,13 @@ export async function POST() {
         maxAge: 60 * 60 * 24 * 30, // 30 days
         path: '/',
       });
+    }
+
+    // Ensure CSRF token exists (for backward compatibility with old sessions)
+    const existingCsrfToken = cookieStore.get(CSRF_COOKIE_NAME)?.value;
+    if (!existingCsrfToken) {
+      const csrfToken = generateCSRFToken();
+      setCSRFCookies(csrfToken, response);
     }
 
     return response;

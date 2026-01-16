@@ -12,6 +12,7 @@ import {
 } from '@/lib/spotify/api';
 import type { PlaylistCreateResponse } from '@/types';
 import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { validateCSRFToken } from '@/lib/csrf';
 
 /**
  * Maximum number of tracks that can be added/removed in a single request
@@ -128,6 +129,15 @@ async function removeTracksInBatches(
  * - playlistUrl: string - URL to the playlist on Spotify
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Validate CSRF token for write operations
+  const csrfResult = await validateCSRFToken(request);
+  if (!csrfResult.valid) {
+    return NextResponse.json(
+      { error: csrfResult.error, code: 'CSRF_ERROR' },
+      { status: 403 }
+    );
+  }
+
   // Apply rate limiting (100 requests per minute per IP)
   const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
   if (!rateLimitResult.success) {
@@ -256,6 +266,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * - playlistUrl: string - URL to the playlist on Spotify
  */
 export async function PUT(request: NextRequest): Promise<NextResponse> {
+  // Validate CSRF token for write operations
+  const csrfResult = await validateCSRFToken(request);
+  if (!csrfResult.valid) {
+    return NextResponse.json(
+      { error: csrfResult.error, code: 'CSRF_ERROR' },
+      { status: 403 }
+    );
+  }
+
   // Apply rate limiting (100 requests per minute per IP)
   const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
   if (!rateLimitResult.success) {

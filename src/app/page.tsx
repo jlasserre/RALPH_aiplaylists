@@ -13,6 +13,7 @@ import { SpotifyLoginButton, AuthStatus } from '@/components/features/auth';
 import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
 import { ErrorBanner } from '@/components/ui';
 import type { ErrorType } from '@/components/ui';
+import { createHeadersWithCSRF } from '@/lib/csrf-client';
 
 export default function Home() {
   // Track hydration state to prevent SSR/CSR mismatch
@@ -632,9 +633,9 @@ export default function Home() {
     async (name: string, trackUris: string[]) => {
       const response = await fetch('/api/spotify/playlist', {
         method: 'POST',
-        headers: {
+        headers: createHeadersWithCSRF({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           name,
           trackUris,
@@ -659,9 +660,9 @@ export default function Home() {
     async (playlistId: string, trackUris: string[]) => {
       const response = await fetch('/api/spotify/playlist', {
         method: 'PUT',
-        headers: {
+        headers: createHeadersWithCSRF({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           playlistId,
           addUris: trackUris,
@@ -689,9 +690,9 @@ export default function Home() {
       if (currentTracks.length > 0) {
         const removeResponse = await fetch('/api/spotify/playlist', {
           method: 'PUT',
-          headers: {
+          headers: createHeadersWithCSRF({
             'Content-Type': 'application/json',
-          },
+          }),
           body: JSON.stringify({
             playlistId,
             removeUris: currentTracks,
@@ -708,9 +709,9 @@ export default function Home() {
       // Then add the new tracks
       const addResponse = await fetch('/api/spotify/playlist', {
         method: 'PUT',
-        headers: {
+        headers: createHeadersWithCSRF({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           playlistId,
           addUris: newTrackUris,
@@ -971,9 +972,9 @@ export default function Home() {
     try {
       const response = await fetch('/api/spotify/playlist', {
         method: 'PUT',
-        headers: {
+        headers: createHeadersWithCSRF({
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           playlistId: spotifyPlaylistId,
           addUris: addUris.length > 0 ? addUris : undefined,

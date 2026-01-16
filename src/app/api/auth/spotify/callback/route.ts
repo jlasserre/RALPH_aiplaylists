@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { generateCSRFToken, setCSRFCookies } from '@/lib/csrf';
 
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
@@ -134,6 +135,10 @@ export async function GET(request: NextRequest) {
     // Clear the temporary auth cookies
     response.cookies.delete('spotify_auth_state');
     response.cookies.delete('spotify_code_verifier');
+
+    // Generate and set CSRF token for write endpoint protection
+    const csrfToken = generateCSRFToken();
+    setCSRFCookies(csrfToken, response);
 
     return response;
   } catch (err) {
