@@ -19,6 +19,8 @@ interface LeftPanelProps {
   onLoadExisting?: (playlistId: string) => void;
   /** Callback when Suggest songs is clicked */
   onSuggestSongs?: (prompt: string, provider: LLMProvider) => void;
+  /** Callback when cancel generation is clicked */
+  onCancelGeneration?: () => void;
   /** Callback when playlist name changes */
   onPlaylistNameChange?: (name: string) => void;
   /** Controlled playlist name value */
@@ -50,6 +52,7 @@ export function LeftPanel({
   onNewPlaylist,
   onLoadExisting,
   onSuggestSongs,
+  onCancelGeneration,
   onPlaylistNameChange,
   playlistName = '',
   isGenerating = false,
@@ -279,16 +282,38 @@ export function LeftPanel({
         rows={4}
       />
 
-      {/* Suggest Songs Button */}
-      <Button
-        variant="primary"
-        className="w-full"
-        onClick={handleSuggestSongs}
-        disabled={!isPromptValid || isGenerating}
-        isLoading={isGenerating}
-      >
-        Suggest songs
-      </Button>
+      {/* Suggest Songs / Cancel Button */}
+      {isGenerating ? (
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={onCancelGeneration}
+        >
+          <svg
+            className="w-4 h-4 mr-2 inline-block"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+          Cancel Generation
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          className="w-full"
+          onClick={handleSuggestSongs}
+          disabled={!isPromptValid}
+        >
+          Suggest songs
+        </Button>
+      )}
     </div>
   );
 }

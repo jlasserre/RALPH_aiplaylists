@@ -872,4 +872,73 @@ describe('candidateStore', () => {
       expect(candidates[1].isSearching).toBe(true);
     });
   });
+
+  describe('cancelSearching', () => {
+    it('should mark all searching candidates as not searching', () => {
+      const songs: Song[] = [
+        { title: 'Song 1', artist: 'Artist 1' },
+        { title: 'Song 2', artist: 'Artist 2' },
+        { title: 'Song 3', artist: 'Artist 3' },
+      ];
+      useCandidateStore.getState().initCandidates(songs);
+
+      // First song completes with match
+      const spotifyTrack: SpotifyTrack = {
+        id: 'track_1',
+        uri: 'spotify:track:1',
+        name: 'Song 1',
+        artists: [{ id: 'a1', name: 'Artist 1' }],
+        album: { id: 'album_1', name: 'Album', images: [] },
+        duration_ms: 180000,
+      };
+      useCandidateStore.getState().updateCandidate(0, spotifyTrack);
+
+      // Now cancel
+      useCandidateStore.getState().cancelSearching();
+
+      const { candidates, isLoading } = useCandidateStore.getState();
+      expect(isLoading).toBe(false);
+      expect(candidates[0].isSearching).toBe(false);
+      expect(candidates[0].isMatched).toBe(true); // First one was found
+      expect(candidates[1].isSearching).toBe(false);
+      expect(candidates[1].isMatched).toBe(false); // Cancelled, not found
+      expect(candidates[2].isSearching).toBe(false);
+      expect(candidates[2].isMatched).toBe(false); // Cancelled, not found
+    });
+
+    it('should keep matched songs when cancelling', () => {
+      const songs: Song[] = [
+        { title: 'Song 1', artist: 'Artist 1' },
+        { title: 'Song 2', artist: 'Artist 2' },
+      ];
+      useCandidateStore.getState().initCandidates(songs);
+
+      const spotifyTrack: SpotifyTrack = {
+        id: 'track_1',
+        uri: 'spotify:track:1',
+        name: 'Song 1',
+        artists: [{ id: 'a1', name: 'Artist 1' }],
+        album: { id: 'album_1', name: 'Album', images: [] },
+        duration_ms: 180000,
+      };
+      useCandidateStore.getState().updateCandidate(0, spotifyTrack);
+
+      useCandidateStore.getState().cancelSearching();
+
+      const { candidates } = useCandidateStore.getState();
+      expect(candidates[0].spotifyTrack).toEqual(spotifyTrack);
+      expect(candidates[0].isMatched).toBe(true);
+    });
+
+    it('should do nothing if no candidates are searching', () => {
+      const song = createMatchedSong('Song 1', 'Artist 1');
+      useCandidateStore.getState().setCandidates([song]);
+
+      useCandidateStore.getState().cancelSearching();
+
+      const { candidates, isLoading } = useCandidateStore.getState();
+      expect(candidates).toHaveLength(1);
+      expect(isLoading).toBe(false);
+    });
+  });
 });

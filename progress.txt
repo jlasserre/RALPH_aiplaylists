@@ -774,3 +774,25 @@
   - Store's isLoading automatically becomes false when all candidates finish searching
   - Concurrency control (5 parallel requests) prevents overwhelming Spotify API
 ---
+
+## 2026-01-16 - US-050
+- What was implemented: Cancel generation button with AbortController support
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added onCancelGeneration prop, shows "Cancel Generation" button during isGenerating
+  - src/store/candidateStore.ts - Added cancelSearching action to mark all searching candidates as not-searching
+  - src/store/candidateStore.test.ts - Added 3 tests for cancelSearching action
+  - src/app/page.tsx - Added useRef for AbortController, handleCancelGeneration callback, pass signal to fetch calls
+- **Implementation details:**
+  - LeftPanel shows "Cancel Generation" button (secondary variant with X icon) when isGenerating is true
+  - AbortController created at start of handleSuggestSongs, stored in abortControllerRef
+  - Both /api/generate and /api/spotify/search/stream fetch calls receive abort signal
+  - When cancelled, AbortError is caught and generation stops gracefully
+  - cancelSearching marks all isSearching candidates as isSearching: false, keeps already-found songs
+  - The cancel button replaces the "Suggest songs" button during generation
+- **Learnings for future iterations:**
+  - AbortController is the standard way to cancel fetch requests
+  - AbortError has name === 'AbortError', check this to distinguish from real errors
+  - Store the AbortController in a ref so it persists across renders
+  - Clean up ref (set to null) when generation completes or is cancelled
+  - Keep found songs when cancelling - user may want to use partial results
+---

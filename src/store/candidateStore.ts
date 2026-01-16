@@ -35,6 +35,8 @@ interface CandidateActions {
     afterCandidateId: string,
     songs: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }>
   ) => void;
+  /** Cancel searching - marks all searching candidates as not searching anymore */
+  cancelSearching: () => void;
 }
 
 type CandidateStore = CandidateState & CandidateActions;
@@ -176,6 +178,16 @@ export const useCandidateStore = create<CandidateStore>((set, get) => ({
 
       return { candidates: newCandidates };
     }),
+
+  cancelSearching: () =>
+    set((state) => ({
+      candidates: state.candidates.map((candidate) =>
+        candidate.isSearching
+          ? { ...candidate, isSearching: false }
+          : candidate
+      ),
+      isLoading: false,
+    })),
 }));
 
 /**

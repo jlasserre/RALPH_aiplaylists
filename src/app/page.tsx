@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ThreePanelLayout, LeftPanel, MiddlePanel, RightPanel } from '@/components/layout';
 import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
@@ -47,6 +47,7 @@ export default function Home() {
   const updateCandidate = useCandidateStore((state) => state.updateCandidate);
   const setLoadingCandidates = useCandidateStore((state) => state.setLoading);
   const insertCandidatesAfter = useCandidateStore((state) => state.insertCandidatesAfter);
+  const cancelSearching = useCandidateStore((state) => state.cancelSearching);
 
   // Tag state and actions
   const toggleTag = useTagStore((state) => state.toggleTag);
@@ -65,6 +66,9 @@ export default function Home() {
     message: string;
     playlistUrl: string;
   } | null>(null);
+
+  // Generation abort controller (for cancel button)
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Name conflict dialog state
   const [conflictDialog, setConflictDialog] = useState<{
@@ -334,6 +338,10 @@ export default function Home() {
         return;
       }
 
+      // Create new abort controller for this generation
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       // Set loading state
       setLoadingCandidates(true);
 
@@ -345,12 +353,14 @@ export default function Home() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ prompt, provider }),
+          signal: abortController.signal,
         });
 
         if (!generateResponse.ok) {
           const errorData = await generateResponse.json().catch(() => ({}));
           console.error('Failed to generate songs:', errorData.message || generateResponse.status);
           setLoadingCandidates(false);
+          abortControllerRef.current = null;
           return;
         }
 
@@ -360,6 +370,7 @@ export default function Home() {
         if (songs.length === 0) {
           console.warn('No songs generated');
           setCandidates([]);
+          abortControllerRef.current = null;
           return;
         }
 
@@ -376,12 +387,14 @@ export default function Home() {
             songs,
             accessToken,
           }),
+          signal: abortController.signal,
         });
 
         if (!searchResponse.ok) {
           const errorData = await searchResponse.json().catch(() => ({}));
           console.error('Failed to search Spotify:', errorData.message || searchResponse.status);
           setLoadingCandidates(false);
+          abortControllerRef.current = null;
           return;
         }
 
@@ -390,56 +403,90 @@ export default function Home() {
         if (!reader) {
           console.error('No response body for streaming');
           setLoadingCandidates(false);
+          abortControllerRef.current = null;
           return;
         }
 
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            // Check if aborted before reading
+            if (abortController.signal.aborted) {
+              await reader.cancel();
+              break;
+            }
 
-          buffer += decoder.decode(value, { stream: true });
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          // Process complete events in buffer
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            buffer += decoder.decode(value, { stream: true });
 
-          let eventType = '';
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith('data: ') && eventType) {
-              const data = JSON.parse(line.slice(6));
+            // Process complete events in buffer
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-              if (eventType === 'result') {
-                // Update individual candidate with search result
-                const { index, result } = data as {
-                  index: number;
-                  result: { song: Song; spotifyTrack: SpotifyTrack | null };
-                };
-                updateCandidate(index, result.spotifyTrack);
-              } else if (eventType === 'complete') {
-                // All searches complete - isLoading will be set to false by updateCandidate
-                console.log(`Search complete, match rate: ${data.matchRate.toFixed(1)}%`);
-              } else if (eventType === 'error') {
-                console.error('Stream error:', data.message);
-                setLoadingCandidates(false);
-                return;
+            let eventType = '';
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                eventType = line.slice(7).trim();
+              } else if (line.startsWith('data: ') && eventType) {
+                const data = JSON.parse(line.slice(6));
+
+                if (eventType === 'result') {
+                  // Update individual candidate with search result
+                  const { index, result } = data as {
+                    index: number;
+                    result: { song: Song; spotifyTrack: SpotifyTrack | null };
+                  };
+                  updateCandidate(index, result.spotifyTrack);
+                } else if (eventType === 'complete') {
+                  // All searches complete - isLoading will be set to false by updateCandidate
+                  console.log(`Search complete, match rate: ${data.matchRate.toFixed(1)}%`);
+                } else if (eventType === 'error') {
+                  console.error('Stream error:', data.message);
+                  setLoadingCandidates(false);
+                  abortControllerRef.current = null;
+                  return;
+                }
+
+                eventType = '';
               }
-
-              eventType = '';
             }
           }
+        } finally {
+          // Clean up abort controller reference when done
+          abortControllerRef.current = null;
         }
       } catch (error) {
-        console.error('Error during song generation:', error);
-        setLoadingCandidates(false);
+        // Don't log abort errors - they're expected when cancelling
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Generation cancelled');
+          // Keep any songs already found - just stop loading for remaining
+          setLoadingCandidates(false);
+        } else {
+          console.error('Error during song generation:', error);
+          setLoadingCandidates(false);
+        }
+        abortControllerRef.current = null;
       }
     },
     [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate]
   );
+
+  /**
+   * Cancel the current generation
+   * Keeps any songs already found, stops searching for the rest
+   */
+  const handleCancelGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Stop searching - candidates already found are kept, others marked as not searching
+    cancelSearching();
+  }, [cancelSearching]);
 
   /**
    * Check if a playlist name already exists in user's playlists
@@ -928,6 +975,7 @@ export default function Home() {
             onNewPlaylist={clearPlaylist}
             onLoadExisting={handleLoadExisting}
             onSuggestSongs={handleSuggestSongs}
+            onCancelGeneration={handleCancelGeneration}
             onPlaylistNameChange={setName}
             playlistName={playlistName}
             isGenerating={isLoadingCandidates}

@@ -848,8 +848,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 50,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added Cancel Generation button in LeftPanel that appears during isGenerating. Uses AbortController to cancel LLM and Spotify search requests. Added cancelSearching action to candidateStore that marks all searching candidates as not-searching while keeping already-found songs."
     },
     {
       "id": "US-051",
