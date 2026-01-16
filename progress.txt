@@ -718,3 +718,16 @@
   - clearTags() after generation ensures clean slate for next tagging session
   - User can edit the generated prompt before clicking "Suggest songs" (editable textarea)
 ---
+
+## 2026-01-16 - US-047
+- What was implemented: Auto-update prompt when tags change
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added isPromptFromTags state, lastTagCountRef, useEffect for tag changes, handlePromptChange to detect manual edits, moved generatePromptFromTags logic here
+  - src/app/page.tsx - Removed handleGenerateFromTags (moved to LeftPanel), pass taggedSongs and onClearTags instead of taggedCount and onGenerateFromTags
+- **Learnings for future iterations:**
+  - Moving prompt generation logic to LeftPanel provides better encapsulation since that's where prompt state lives
+  - useEffect watching taggedSongs array regenerates prompt when isPromptFromTags is true
+  - lastTagCountRef prevents infinite loops by tracking previous tag count
+  - Manual edit detection: any onChange on textarea sets isPromptFromTags = false
+  - Clear prompt when all tags removed (taggedSongs.length === 0 && isPromptFromTags)
+---

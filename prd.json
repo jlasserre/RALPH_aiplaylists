@@ -800,8 +800,8 @@
         "Typecheck passes"
       ],
       "priority": 47,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added isPromptFromTags state and useEffect in LeftPanel that watches taggedSongs changes. When tags change and prompt was auto-generated, the prompt is regenerated. Manual edits to the textarea set isPromptFromTags=false, disabling auto-update. If all tags are removed, prompt is cleared."
     },
     {
       "id": "US-048",
