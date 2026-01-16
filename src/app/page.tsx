@@ -5,8 +5,8 @@ import { ThreePanelLayout, LeftPanel, MiddlePanel, RightPanel } from '@/componen
 import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
-import { useAuthStore } from '@/store/authStore';
 import { useTagStore } from '@/store/tagStore';
+import { useSpotifyAuth } from '@/hooks/useSpotifyAuth';
 import { NameConflictDialog } from '@/components/features/playlist';
 import type { ConflictResolution } from '@/components/features/playlist';
 import { SpotifyLoginButton, AuthStatus } from '@/components/features/auth';
@@ -22,9 +22,8 @@ export default function Home() {
     setIsHydrated(true);
   }, []);
 
-  // Auth state
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  // Auth state - use hook for auto-refresh on mount
+  const { accessToken, isAuthenticated, isLoading: isAuthLoading } = useSpotifyAuth();
 
   // Playlist state and actions
   const {
@@ -1055,8 +1054,69 @@ export default function Home() {
   // Determine if playlist is read-only (not owned)
   const isReadOnly = !isOwned;
 
+  // Show login prompt for unauthenticated users (after hydration and auth check)
+  const showLoginPrompt = isHydrated && !isAuthLoading && !isAuthenticated;
+
   return (
     <>
+      {/* Login prompt overlay for unauthenticated users */}
+      {showLoginPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm">
+          <div className="mx-4 max-w-md w-full bg-white rounded-xl shadow-2xl p-8 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8 text-green-600"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Welcome to AI Playlist Generator
+              </h2>
+              <p className="text-gray-600">
+                Create personalized Spotify playlists using AI. Describe the mood, genre, or vibe you want, and we&apos;ll generate the perfect playlist for you.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-8 h-8 flex-shrink-0 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">AI-Powered Suggestions</h3>
+                  <p className="text-sm text-gray-500">Describe what you want to hear and get instant song recommendations</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-8 h-8 flex-shrink-0 bg-purple-100 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Direct Spotify Integration</h3>
+                  <p className="text-sm text-gray-500">Save your playlists directly to your Spotify account</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <SpotifyLoginButton className="w-full justify-center" />
+              <p className="mt-3 text-xs text-gray-500">
+                We only request permissions to create and modify playlists
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ThreePanelLayout
         header={
           <div className="flex flex-col gap-2">
