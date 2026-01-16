@@ -1062,6 +1062,52 @@
       "priority": 63,
       "passes": true,
       "notes": "Created backoff.ts with exponential backoff utilities (calculateBackoffDelay, calculateDelayWithRetryAfter, getBackoffResult). Integrated into SpotifyClient fetch wrapper with auto-retry for 429 and 5xx. 42 new tests with mocked timers. Default config: maxRetries=3, baseDelayMs=1000, maxDelayMs=30000."
+    },
+    {
+      "id": "US-064",
+      "title": "Remove Trusted Types CSP directive for Next.js compatibility",
+      "description": "As a developer, I need to remove the 'require-trusted-types-for script' CSP directive because Next.js dynamically injects script elements for code splitting and hot reload without using the Trusted Types API, causing 'Failed to set the src property on HTMLScriptElement: This document requires TrustedScriptURL assignment' errors that break page loading.",
+      "acceptanceCriteria": [
+        "Remove 'require-trusted-types-for script' from CSP in next.config.ts",
+        "App loads without 'TrustedScriptURL' console errors",
+        "Other security headers remain intact",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 64,
+      "passes": true,
+      "notes": "Removed 'require-trusted-types-for script' from CSP directive in next.config.ts. App loads successfully without TrustedScriptURL errors. Other security headers remain intact."
+    },
+    {
+      "id": "US-065",
+      "title": "Create .env.local from example template",
+      "description": "As a developer, I need a .env.local file created from .env.local.example with placeholder values so that I can fill in my actual Spotify and LLM API credentials for local development.",
+      "acceptanceCriteria": [
+        "Copy .env.local.example to .env.local",
+        "File contains placeholder values for NEXT_PUBLIC_SPOTIFY_CLIENT_ID, NEXT_PUBLIC_SPOTIFY_REDIRECT_URI, OPENAI_API_KEY, ANTHROPIC_API_KEY, and LLM_DEFAULT_PROVIDER",
+        "File is not committed to git (verified by .gitignore pattern)",
+        "App starts with npm run dev (may show auth errors until real credentials added)"
+      ],
+      "priority": 65,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-066",
+      "title": "Add setup documentation to README.md",
+      "description": "As a developer, I need clear setup instructions in README.md so that I can configure Spotify OAuth, LLM API keys, and run the app locally without guessing the required steps.",
+      "acceptanceCriteria": [
+        "README.md includes project overview and features",
+        "README.md includes prerequisites (Node.js version, npm)",
+        "README.md includes Spotify Developer App setup steps (create app, get client ID, set redirect URI)",
+        "README.md includes LLM provider setup (how to get OpenAI and/or Anthropic API keys)",
+        "README.md includes environment variables section explaining each variable in .env.local",
+        "README.md includes installation and run instructions (npm install, npm run dev)",
+        "README.md includes note about using 127.0.0.1 vs localhost for Spotify redirect URI"
+      ],
+      "priority": 66,
+      "passes": false,
+      "notes": ""
     }
   ]
 }

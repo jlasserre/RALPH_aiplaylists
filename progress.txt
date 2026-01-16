@@ -923,3 +923,14 @@
   - Retry logic only applies to 429 (rate limit) and 5xx (server errors), not 4xx client errors
   - The condition `attempt > maxRetries` (not `>=`) allows the full number of retries to occur
 ---
+
+## 2026-01-16 - US-064
+- What was implemented: Removed Trusted Types CSP directive for Next.js compatibility
+- Files changed:
+  - next.config.ts - Removed 'require-trusted-types-for script' from Content-Security-Policy header
+- **Learnings for future iterations:**
+  - Next.js dynamically injects script elements for code splitting and hot reload without using the Trusted Types API
+  - The 'require-trusted-types-for script' CSP directive causes 'TrustedScriptURL assignment' errors that break Next.js page loading
+  - Other CSP directives like frame-ancestors 'none', default-src 'self', script-src restrictions remain effective for security
+  - Browser verification showed 401 errors on /api/auth/refresh are expected (no Spotify session) - not related to CSP
+---
