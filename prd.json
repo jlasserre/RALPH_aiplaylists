@@ -895,8 +895,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 53,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added isDuplicate field to PlaylistSong interface. playlistStore.addSongs detects duplicates by Spotify track ID (excluding songs marked for removal). SongCard shows orange styling (bg-orange-50, border-orange-300) and 'Duplicate' badge. PlaylistView shows count banner. 4 tests for duplicate detection."
     },
     {
       "id": "US-054",
