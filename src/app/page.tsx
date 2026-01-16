@@ -10,6 +10,8 @@ import { useTagStore } from '@/store/tagStore';
 import { NameConflictDialog } from '@/components/features/playlist';
 import type { ConflictResolution } from '@/components/features/playlist';
 import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
+import { ErrorBanner } from '@/components/ui';
+import type { ErrorType } from '@/components/ui';
 
 export default function Home() {
   // Track hydration state to prevent SSR/CSR mismatch
@@ -86,6 +88,66 @@ export default function Home() {
     playlistName: string;
     playlistId: string;
   }>({ isOpen: false, playlistName: '', playlistId: '' });
+
+  // Error state for displaying error banners
+  const [error, setError] = useState<{
+    message: string;
+    type: ErrorType;
+    details?: string;
+    retryAfter?: number;
+    retryAction?: () => void;
+  } | null>(null);
+
+  // Store the last action params for retry functionality
+  const lastActionRef = useRef<{
+    type: 'generate' | 'loadPlaylist' | 'createPlaylist' | 'updatePlaylist' | 'moreLikeThis';
+    params?: unknown;
+  } | null>(null);
+
+  /**
+   * Clear error state
+   */
+  const dismissError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  /**
+   * Set error with proper type detection
+   */
+  const setErrorWithType = useCallback((
+    message: string,
+    statusCode?: number,
+    details?: string,
+    retryAction?: () => void
+  ) => {
+    let type: ErrorType = 'generic';
+    let retryAfter: number | undefined;
+
+    if (statusCode === 401 || statusCode === 403) {
+      type = 'auth';
+    } else if (statusCode === 429) {
+      type = 'rate-limit';
+      // Try to extract retry-after from details if available
+      const match = details?.match(/retry.after[:\s]+(\d+)/i);
+      if (match) {
+        retryAfter = parseInt(match[1], 10);
+      }
+    } else if (message.toLowerCase().includes('llm') || message.toLowerCase().includes('claude') || message.toLowerCase().includes('openai')) {
+      type = 'llm';
+    } else if (message.toLowerCase().includes('spotify')) {
+      type = 'spotify';
+    } else if (message.toLowerCase().includes('network') || message.toLowerCase().includes('fetch') || message.toLowerCase().includes('connection')) {
+      type = 'network';
+    }
+
+    setError({
+      message,
+      type,
+      details,
+      retryAfter,
+      retryAction,
+    });
+  }, []);
 
   /**
    * Fetch user's playlists when authenticated
@@ -343,10 +405,16 @@ export default function Home() {
    */
   const handleSuggestSongs = useCallback(
     async (prompt: string, provider: LLMProvider) => {
+      // Clear any previous errors
+      setError(null);
+
       if (!accessToken) {
-        console.error('Not authenticated');
+        setErrorWithType('Please log in to Spotify to generate song suggestions.', 401);
         return;
       }
+
+      // Store action for retry
+      lastActionRef.current = { type: 'generate', params: { prompt, provider } };
 
       // Create new abort controller for this generation
       const abortController = new AbortController();
@@ -368,7 +436,13 @@ export default function Home() {
 
         if (!generateResponse.ok) {
           const errorData = await generateResponse.json().catch(() => ({}));
-          console.error('Failed to generate songs:', errorData.message || generateResponse.status);
+          const errorMessage = errorData.message || `Failed to generate songs (${generateResponse.status})`;
+          setErrorWithType(
+            errorMessage,
+            generateResponse.status,
+            errorData.details,
+            () => handleSuggestSongs(prompt, provider)
+          );
           setLoadingCandidates(false);
           abortControllerRef.current = null;
           return;
@@ -402,7 +476,13 @@ export default function Home() {
 
         if (!searchResponse.ok) {
           const errorData = await searchResponse.json().catch(() => ({}));
-          console.error('Failed to search Spotify:', errorData.message || searchResponse.status);
+          const errorMessage = errorData.message || `Failed to search Spotify (${searchResponse.status})`;
+          setErrorWithType(
+            errorMessage,
+            searchResponse.status,
+            errorData.details,
+            () => handleSuggestSongs(prompt, provider)
+          );
           setLoadingCandidates(false);
           abortControllerRef.current = null;
           return;
@@ -474,7 +554,12 @@ export default function Home() {
                       });
                   }
                 } else if (eventType === 'error') {
-                  console.error('Stream error:', data.message);
+                  setErrorWithType(
+                    data.message || 'An error occurred during search',
+                    undefined,
+                    data.details,
+                    () => handleSuggestSongs(prompt, provider)
+                  );
                   setLoadingCandidates(false);
                   abortControllerRef.current = null;
                   return;
@@ -489,19 +574,24 @@ export default function Home() {
           abortControllerRef.current = null;
         }
       } catch (error) {
-        // Don't log abort errors - they're expected when cancelling
+        // Don't show error for abort - it's expected when cancelling
         if (error instanceof Error && error.name === 'AbortError') {
-          console.log('Generation cancelled');
           // Keep any songs already found - just stop loading for remaining
           setLoadingCandidates(false);
         } else {
-          console.error('Error during song generation:', error);
+          const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+          setErrorWithType(
+            errorMessage,
+            undefined,
+            error instanceof Error ? error.stack : undefined,
+            () => handleSuggestSongs(prompt, provider)
+          );
           setLoadingCandidates(false);
         }
         abortControllerRef.current = null;
       }
     },
-    [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate, playlistName]
+    [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate, playlistName, setErrorWithType]
   );
 
   /**
@@ -757,8 +847,11 @@ export default function Home() {
    * Checks for name conflicts before creating
    */
   const handleCreatePlaylist = useCallback(async () => {
+    // Clear any previous errors
+    setError(null);
+
     if (!accessToken) {
-      console.error('Not authenticated');
+      setErrorWithType('Please log in to Spotify to create a playlist.', 401);
       return;
     }
 
@@ -766,7 +859,7 @@ export default function Home() {
     const pendingSongs = songs.filter((s) => s.state === 'pending');
 
     if (pendingSongs.length === 0) {
-      console.warn('No pending songs to add');
+      setErrorWithType('No songs to add to the playlist. Add some songs first.');
       return;
     }
 
@@ -779,7 +872,7 @@ export default function Home() {
       .filter((uri): uri is string => !!uri);
 
     if (trackUris.length === 0) {
-      console.error('No valid track URIs found');
+      setErrorWithType('No valid Spotify tracks found. Make sure songs are matched on Spotify.');
       return;
     }
 
@@ -803,7 +896,13 @@ export default function Home() {
       const data = await createPlaylistOnSpotify(finalName, trackUris);
       finalizePlaylistCreation(data, finalName, 'Playlist created successfully!');
     } catch (error) {
-      console.error('Error creating playlist:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create playlist';
+      setErrorWithType(
+        errorMessage,
+        undefined,
+        error instanceof Error ? error.stack : undefined,
+        () => handleCreatePlaylist()
+      );
     } finally {
       setIsSaving(false);
     }
@@ -815,6 +914,7 @@ export default function Home() {
     findConflictingPlaylist,
     createPlaylistOnSpotify,
     finalizePlaylistCreation,
+    setErrorWithType,
   ]);
 
   /**
@@ -823,13 +923,16 @@ export default function Home() {
    * Adds pending songs and removes markedForRemoval songs
    */
   const handleUpdatePlaylist = useCallback(async () => {
+    // Clear any previous errors
+    setError(null);
+
     if (!accessToken) {
-      console.error('Not authenticated');
+      setErrorWithType('Please log in to Spotify to update the playlist.', 401);
       return;
     }
 
     if (!spotifyPlaylistId) {
-      console.error('No playlist ID to update');
+      setErrorWithType('No playlist loaded. Please load or create a playlist first.');
       return;
     }
 
@@ -841,7 +944,7 @@ export default function Home() {
 
     // Check if there are any changes to sync
     if (pendingSongs.length === 0 && songsToRemove.length === 0) {
-      console.warn('No changes to sync');
+      setErrorWithType('No changes to sync. Add or remove songs first.');
       return;
     }
 
@@ -857,7 +960,7 @@ export default function Home() {
 
     // Check if we have valid URIs for changes
     if (addUris.length === 0 && removeUris.length === 0) {
-      console.error('No valid track URIs found');
+      setErrorWithType('No valid Spotify tracks to add or remove.');
       return;
     }
 
@@ -880,7 +983,14 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to update playlist:', errorData.message || response.status);
+        const errorMessage = errorData.message || `Failed to update playlist (${response.status})`;
+        setErrorWithType(
+          errorMessage,
+          response.status,
+          errorData.details,
+          () => handleUpdatePlaylist()
+        );
+        setIsSaving(false);
         return;
       }
 
@@ -898,7 +1008,13 @@ export default function Home() {
         playlistUrl: data.playlistUrl,
       });
     } catch (error) {
-      console.error('Error updating playlist:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update playlist';
+      setErrorWithType(
+        errorMessage,
+        undefined,
+        error instanceof Error ? error.stack : undefined,
+        () => handleUpdatePlaylist()
+      );
     } finally {
       setIsSaving(false);
     }
@@ -908,6 +1024,7 @@ export default function Home() {
     songs,
     markPendingAsSynced,
     removeMarkedSongs,
+    setErrorWithType,
   ]);
 
   /**
@@ -1017,6 +1134,18 @@ export default function Home() {
                   </svg>
                 </button>
               </div>
+            )}
+
+            {/* Error banner */}
+            {error && (
+              <ErrorBanner
+                message={error.message}
+                type={error.type}
+                details={error.details}
+                retryAfter={error.retryAfter}
+                onRetry={error.retryAction}
+                onDismiss={dismissError}
+              />
             )}
           </div>
         }
