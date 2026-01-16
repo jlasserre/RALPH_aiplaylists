@@ -864,8 +864,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 51,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added suggestedName state and hasGeneratedRef to page.tsx. Call /api/generate/suggest-name after first successful streaming search completion (fire-and-forget). LeftPanel shows suggested name as placeholder with hint text. handleCreatePlaylist uses suggested name if no name provided."
     },
     {
       "id": "US-052",

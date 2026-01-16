@@ -796,3 +796,15 @@
   - Clean up ref (set to null) when generation completes or is cancelled
   - Keep found songs when cancelling - user may want to use partial results
 ---
+
+## 2026-01-16 - US-051
+- What was implemented: Added playlist name auto-suggestion after first generation
+- Files changed:
+  - src/app/page.tsx - Added suggestedName state, hasGeneratedRef to track first generation, calls /api/generate/suggest-name after successful streaming completion, uses suggested name in handleCreatePlaylist fallback
+  - src/components/layout/LeftPanel.tsx - Added suggestedName prop, shows as placeholder in name input, displays hint text when suggested name available
+- **Learnings for future iterations:**
+  - Fire-and-forget async calls can be done with .then().catch() chains without awaiting
+  - useRef is useful for tracking one-time flags that should not trigger re-renders
+  - suggestedName can be used as a fallback in the save logic without requiring the user to explicitly accept it
+---
+
