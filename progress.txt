@@ -839,3 +839,34 @@
   - Frontend utility createHeadersWithCSRF merges CSRF token with other headers for easy integration
   - process.env.NODE_ENV is read-only in TypeScript strict mode - test secure flag based on current env value instead of modifying
 ---
+
+## 2026-01-16 - US-060
+- What was implemented: CSP headers and security settings in next.config.ts
+- Files changed:
+  - next.config.ts - Added async headers() function with comprehensive security headers
+- **Security headers added:**
+  - Content-Security-Policy with:
+    - default-src 'self'
+    - script-src 'self' 'unsafe-inline' 'unsafe-eval' (required for Next.js)
+    - style-src 'self' 'unsafe-inline' (required for Tailwind)
+    - img-src 'self' + Spotify CDN domains + data: + blob:
+    - font-src 'self'
+    - connect-src 'self' + Spotify API + LLM APIs (Anthropic, OpenAI)
+    - form-action 'self'
+    - frame-ancestors 'none'
+    - base-uri 'self'
+    - require-trusted-types-for 'script' (Trusted Types enabled)
+  - X-Frame-Options: DENY
+  - X-Content-Type-Options: nosniff
+  - X-XSS-Protection: 1; mode=block
+  - Referrer-Policy: strict-origin-when-cross-origin
+  - Strict-Transport-Security: max-age=31536000; includeSubDomains
+  - Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+- **Learnings for future iterations:**
+  - Next.js uses async headers() function in next.config.ts for custom HTTP headers
+  - Source pattern "/:path*" applies headers to all routes
+  - CSP requires 'unsafe-inline' and 'unsafe-eval' for Next.js/React hydration
+  - Spotify uses multiple CDN domains for images: i.scdn.co, image-cdn-ak.spotifycdn.com, image-cdn-fa.spotifycdn.com
+  - frame-ancestors 'none' in CSP is redundant with X-Frame-Options: DENY but provides defense-in-depth
+  - Trusted Types enabled with require-trusted-types-for 'script' helps prevent DOM XSS
+---

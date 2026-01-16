@@ -1009,8 +1009,8 @@
         "Typecheck passes"
       ],
       "priority": 60,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added comprehensive security headers in next.config.ts using async headers() function. CSP includes default-src 'self', script/style restrictions with necessary Next.js allowances, img-src for Spotify CDN, connect-src for APIs, frame-ancestors 'none', and require-trusted-types-for 'script'. Also added X-Frame-Options: DENY, X-Content-Type-Options: nosniff, X-XSS-Protection, Referrer-Policy, Strict-Transport-Security, and Permissions-Policy."
     },
     {
       "id": "US-061",
