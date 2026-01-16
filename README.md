@@ -153,6 +153,14 @@ npm run test:coverage # Run tests with coverage report
 - Some songs suggested by the LLM may not be available on Spotify
 - The app shows a match rate (e.g., "15 of 20 songs found") and marks unfound songs
 
+### Platform mismatch error (EBADPLATFORM) after cloning
+If you see an error about `@next/swc-linux-x64-gnu` (or similar platform-specific package) when running `npm install`:
+1. Delete `package-lock.json`
+2. Delete `node_modules` folder if it exists
+3. Run `npm install` again
+
+This happens when the lock file was generated on a different platform (e.g., Linux Docker container vs native Windows, or vice versa). The lock file captures platform-specific optional dependencies that don't exist for your OS.
+
 ## About Ralph
 
 This project was built following the [Getting Started With Ralph](https://www.aihero.dev/getting-started-with-ralph) tutorial from AI Hero. Ralph is an autonomous AI agent loop technique that runs Claude Code repeatedly until all PRD (Product Requirements Document) items are complete.
