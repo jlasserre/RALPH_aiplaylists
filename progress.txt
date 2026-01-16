@@ -686,3 +686,22 @@
   - Always show button conditionally: `onMoreLikeThis && spotifyTrackId && isMatched` ensures it only appears when functional
   - Next.js dev server caches aggressively - sometimes need to clear .next and restart for component changes
 ---
+
+## 2026-01-16 - US-045
+- What was implemented: Song tagging UI for marking songs to generate prompts from
+- Files changed:
+  - src/store/tagStore.ts - New Zustand store with toggleTag, isTagged, clearTags actions, and getTaggedCount/getTaggedSongs selectors
+  - src/store/tagStore.test.ts - 18 tests covering all actions and selectors
+  - src/components/features/playlist/SongCard.tsx - Added TagButton component (tag icon), onToggleTag and isTagged props, amber styling for tagged state
+  - src/components/features/playlist/CandidateList.tsx - Added tag button in action buttons group, amber border/background for tagged songs
+  - src/components/features/playlist/PlaylistView.tsx - Added onToggleTag and isTagged props, passed to SongCard
+  - src/components/layout/MiddlePanel.tsx - Added onToggleTag and isTagged props pass-through
+  - src/components/layout/RightPanel.tsx - Added onToggleTag and isTagged props pass-through
+  - src/app/page.tsx - Added useTagStore import, toggleTag and isTagged from store, passed to both panels
+- **Learnings for future iterations:**
+  - Separate tag store makes sense since tags work across both candidates (middle) and playlist (right) panels
+  - TaggedSong stores both spotifyTrackId and Song object for future prompt generation
+  - Amber color scheme (bg-amber-50, border-amber-300) provides good visual distinction from other states
+  - Tag icon (label/tag shape) with fill when tagged, outline when not, is intuitive UX
+  - 18 tests for tagStore cover: toggle on/off, multiple tags, isTagged check, clearTags, and selectors
+---
