@@ -11,6 +11,7 @@ import {
   SpotifyAPIError,
 } from '@/lib/spotify/api';
 import type { UserPlaylist } from '@/types';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * GET /api/spotify/playlists
@@ -24,6 +25,12 @@ import type { UserPlaylist } from '@/types';
  * - playlists: UserPlaylist[] - Array of user playlists with ownership info
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   const searchParams = request.nextUrl.searchParams;
 
   // Get access token from query params

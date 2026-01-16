@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLLMClient, LLMProvider, ClaudeAPIError, OpenAIAPIError } from '@/lib/llm';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * Request body for playlist name suggestion
@@ -52,6 +53,12 @@ const VALID_PROVIDERS: LLMProvider[] = ['claude', 'openai'];
  * - name: string - Suggested playlist name
  */
 export async function POST(request: NextRequest): Promise<NextResponse<SuggestNameResponse | ErrorResponse>> {
+  // Apply rate limiting (10 requests per minute per session)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.generate, 'generate');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse<ErrorResponse>;
+  }
+
   try {
     // Parse request body
     let body: SuggestNameRequest;

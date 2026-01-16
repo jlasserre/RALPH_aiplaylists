@@ -11,6 +11,7 @@ import {
   SpotifyAPIError,
 } from '@/lib/spotify/api';
 import type { Song, SpotifySearchResult, SpotifySearchResponse } from '@/types';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * Maximum number of concurrent Spotify search requests
@@ -70,6 +71,12 @@ async function executeWithConcurrency<T>(
  * - matchRate: number - Percentage of songs found (0-100)
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   // Parse request body
   let body: unknown;
   try {

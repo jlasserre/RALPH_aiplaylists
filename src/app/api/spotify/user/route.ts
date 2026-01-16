@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * GET /api/spotify/user
  * Fetches the current user's Spotify profile
  */
 export async function GET(request: NextRequest) {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
   const { searchParams } = new URL(request.url);
   const accessToken = searchParams.get('accessToken');
 

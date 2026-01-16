@@ -11,6 +11,7 @@ import {
   SpotifyAPIError,
 } from '@/lib/spotify/api';
 import type { SpotifyTrack } from '@/types';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 interface RouteParams {
   params: Promise<{ playlistId: string }>;
@@ -31,6 +32,12 @@ export async function GET(
   request: NextRequest,
   { params }: RouteParams
 ): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   const { playlistId } = await params;
   const searchParams = request.nextUrl.searchParams;
 

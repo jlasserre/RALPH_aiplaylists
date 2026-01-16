@@ -11,6 +11,7 @@ import {
   SpotifyAPIError,
 } from '@/lib/spotify/api';
 import type { PlaylistCreateResponse } from '@/types';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * Maximum number of tracks that can be added/removed in a single request
@@ -127,6 +128,12 @@ async function removeTracksInBatches(
  * - playlistUrl: string - URL to the playlist on Spotify
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   // Parse request body
   let body: unknown;
   try {
@@ -249,6 +256,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * - playlistUrl: string - URL to the playlist on Spotify
  */
 export async function PUT(request: NextRequest): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   // Parse request body
   let body: unknown;
   try {

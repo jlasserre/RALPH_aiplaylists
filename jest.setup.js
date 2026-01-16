@@ -12,6 +12,38 @@ Object.defineProperty(global, 'crypto', {
   value: webcrypto,
 });
 
+// Polyfill fetch API classes for server-side tests (Request, Response, Headers)
+// These are needed for testing API route handlers
+if (typeof global.Request === 'undefined') {
+  global.Request = class Request {
+    constructor(url, init = {}) {
+      this.url = url;
+      this.method = init.method || 'GET';
+      this.headers = new Map(Object.entries(init.headers || {}));
+      this._body = init.body;
+    }
+    get(headerName) {
+      return this.headers.get(headerName.toLowerCase());
+    }
+  };
+  global.Request.prototype.headers = {
+    get(name) { return null; }
+  };
+}
+
+if (typeof global.Response === 'undefined') {
+  global.Response = class Response {
+    constructor(body, init = {}) {
+      this._body = body;
+      this.status = init.status || 200;
+      this.headers = new Map(Object.entries(init.headers || {}));
+    }
+    async json() {
+      return JSON.parse(this._body);
+    }
+  };
+}
+
 // Mock localStorage
 const localStorageMock = {
   getItem: jest.fn(),

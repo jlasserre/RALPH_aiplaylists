@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SpotifyClient, SpotifyAuthError, SpotifyRateLimitError, SpotifyAPIError } from '@/lib/spotify/api';
 import { SpotifyTrack } from '@/types';
+import { applyRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * POST /api/spotify/recommendations
@@ -15,6 +16,12 @@ import { SpotifyTrack } from '@/types';
  * - tracks: SpotifyTrack[] - Array of recommended tracks
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Apply rate limiting (100 requests per minute per IP)
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.general, 'general');
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response as NextResponse;
+  }
+
   try {
     const body = await request.json();
     const { seedTrackId, accessToken, limit = 10 } = body;
