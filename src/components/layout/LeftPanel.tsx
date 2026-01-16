@@ -1,8 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Input, TextArea } from '@/components/ui';
-import type { UserPlaylist } from '@/types';
+import type { UserPlaylist, Song } from '@/types';
+
+/** Tagged song info for prompt generation */
+interface TaggedSong {
+  spotifyTrackId: string;
+  song: Song;
+}
 
 type LLMProvider = 'claude' | 'openai';
 
@@ -23,10 +29,10 @@ interface LeftPanelProps {
   userPlaylists?: UserPlaylist[];
   /** Whether playlists are being loaded */
   isLoadingPlaylists?: boolean;
-  /** Number of songs currently tagged */
-  taggedCount?: number;
-  /** Callback when "Generate Prompt from Tags" is clicked */
-  onGenerateFromTags?: () => string | undefined;
+  /** Tagged songs for prompt generation */
+  taggedSongs?: TaggedSong[];
+  /** Callback when tags should be cleared (after using them) */
+  onClearTags?: () => void;
 }
 
 const PROMPT_MIN_LENGTH = 10;
@@ -49,11 +55,15 @@ export function LeftPanel({
   isGenerating = false,
   userPlaylists = [],
   isLoadingPlaylists = false,
-  taggedCount = 0,
-  onGenerateFromTags,
+  taggedSongs = [],
+  onClearTags,
 }: LeftPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('claude');
+  // Track if the current prompt was auto-generated from tags
+  const [isPromptFromTags, setIsPromptFromTags] = useState(false);
+  // Track the last tag count to detect tag changes
+  const lastTagCountRef = useRef(0);
 
   /**
    * Handle New Playlist click - clears prompt and calls parent handler
@@ -70,15 +80,60 @@ export function LeftPanel({
   };
 
   /**
+   * Generate a prompt string from the tagged songs
+   */
+  const generatePromptFromTags = (songs: TaggedSong[]): string => {
+    if (songs.length === 0) return '';
+    const songDescriptions = songs.map(
+      (tagged) => `"${tagged.song.title}" by ${tagged.song.artist}`
+    );
+    return `Songs similar to ${songDescriptions.join(', ')}`;
+  };
+
+  /**
    * Handle Generate Prompt from Tags click
-   * Calls parent handler and sets the returned prompt in the textarea
+   * Generates prompt, sets it in textarea, marks as from tags, and clears tags
    */
   const handleGenerateFromTags = () => {
-    const generatedPrompt = onGenerateFromTags?.();
-    if (generatedPrompt) {
-      setPrompt(generatedPrompt);
+    if (taggedSongs.length === 0) return;
+
+    const generatedPrompt = generatePromptFromTags(taggedSongs);
+    setPrompt(generatedPrompt);
+    setIsPromptFromTags(true);
+    lastTagCountRef.current = 0; // Reset since we're clearing
+    onClearTags?.();
+  };
+
+  /**
+   * Handle manual prompt changes
+   * If user edits the prompt manually, disable auto-update from tags
+   */
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrompt(e.target.value);
+    // Any manual edit disables the auto-update
+    if (isPromptFromTags) {
+      setIsPromptFromTags(false);
     }
   };
+
+  /**
+   * Auto-update prompt when tags change (only if prompt was generated from tags)
+   */
+  useEffect(() => {
+    // If prompt is from tags and tags have changed, regenerate
+    if (isPromptFromTags && taggedSongs.length !== lastTagCountRef.current) {
+      if (taggedSongs.length > 0) {
+        // Update prompt with new tags
+        const updatedPrompt = generatePromptFromTags(taggedSongs);
+        setPrompt(updatedPrompt);
+      } else {
+        // All tags removed, clear the prompt
+        setPrompt('');
+        setIsPromptFromTags(false);
+      }
+    }
+    lastTagCountRef.current = taggedSongs.length;
+  }, [taggedSongs, isPromptFromTags]);
 
   const isPromptValid = prompt.length >= PROMPT_MIN_LENGTH;
   const promptError =
@@ -186,7 +241,7 @@ export function LeftPanel({
       />
 
       {/* Generate from Tags Button - shown when songs are tagged */}
-      {taggedCount > 0 && (
+      {taggedSongs.length > 0 && (
         <Button
           variant="secondary"
           size="sm"
@@ -206,7 +261,7 @@ export function LeftPanel({
               d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
             />
           </svg>
-          Generate Prompt from {taggedCount} Tagged {taggedCount === 1 ? 'Song' : 'Songs'}
+          Generate Prompt from {taggedSongs.length} Tagged {taggedSongs.length === 1 ? 'Song' : 'Songs'}
         </Button>
       )}
 
@@ -215,7 +270,7 @@ export function LeftPanel({
         label="Prompt"
         placeholder="Describe the music you want... (e.g., 'upbeat 90s pop songs for a road trip')"
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={handlePromptChange}
         minLength={PROMPT_MIN_LENGTH}
         maxLength={PROMPT_MAX_LENGTH}
         showCharacterCount
