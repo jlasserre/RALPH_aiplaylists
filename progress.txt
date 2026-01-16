@@ -934,3 +934,27 @@
   - Other CSP directives like frame-ancestors 'none', default-src 'self', script-src restrictions remain effective for security
   - Browser verification showed 401 errors on /api/auth/refresh are expected (no Spotify session) - not related to CSP
 ---
+
+## 2026-01-16 - US-065
+- What was implemented: Created .env.local from .env.local.example template
+- Files changed:
+  - .env.local - Created (not tracked by git) with placeholder values for Spotify OAuth and LLM API keys
+- **Learnings for future iterations:**
+  - .env.local is intentionally gitignored (matches `.env*` pattern in .gitignore)
+  - This user story is unique in that it creates a local file that should NOT be committed
+  - The file existence can be verified with `git check-ignore .env.local`
+  - App starts correctly and shows "Environments: .env.local" confirming Next.js reads the file
+  - No commit needed for this story since .env.local is a local development file
+---
+
+## 2026-01-16 - US-066
+- What was implemented: Added comprehensive setup documentation to README.md
+- Files changed:
+  - README.md - Complete rewrite with project overview, features, prerequisites, setup instructions, usage guide, development scripts, and troubleshooting
+- **Learnings for future iterations:**
+  - README.md already existed with placeholder content, so this was a content update rather than new file creation
+  - Emphasized using 127.0.0.1 instead of localhost for Spotify OAuth redirect URIs - this is a common gotcha
+  - Environment variables table format with Required/Description columns provides clear documentation
+  - Step-by-step setup instructions should include both Spotify Developer App creation and LLM API key acquisition
+  - Including a "Troubleshooting" section for common issues saves users time
+---
