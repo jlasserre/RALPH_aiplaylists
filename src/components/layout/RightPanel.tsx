@@ -1,6 +1,6 @@
 'use client';
 
-import { PlaylistSong } from '@/types';
+import { PlaylistSong, Song } from '@/types';
 import { PlaylistView } from '@/components/features/playlist/PlaylistView';
 
 interface RightPanelProps {
@@ -24,6 +24,10 @@ interface RightPanelProps {
   onReorder?: (fromIndex: number, toIndex: number) => void;
   /** Callback when "More Like This" is clicked for a song */
   onMoreLikeThis?: (spotifyTrackId: string) => void;
+  /** Callback when tag toggle is clicked for a song */
+  onToggleTag?: (spotifyTrackId: string, song: Song) => void;
+  /** Function to check if a song is tagged */
+  isTagged?: (spotifyTrackId: string) => boolean;
 }
 
 /**
@@ -41,6 +45,8 @@ export function RightPanel({
   onCandidateDrop,
   onReorder,
   onMoreLikeThis,
+  onToggleTag,
+  isTagged,
 }: RightPanelProps) {
   return (
     <div className="flex flex-col h-full">
@@ -78,6 +84,8 @@ export function RightPanel({
           onCandidateDrop={onCandidateDrop}
           onReorder={onReorder}
           onMoreLikeThis={onMoreLikeThis}
+          onToggleTag={onToggleTag}
+          isTagged={isTagged}
         />
       )}
     </div>

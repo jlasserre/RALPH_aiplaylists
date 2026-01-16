@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, DragEvent } from 'react';
-import { CandidateSong } from '@/types';
+import { CandidateSong, Song } from '@/types';
 import { Button, Checkbox } from '@/components/ui';
 import { PLAYLIST_SONG_DRAG_TYPE } from './PlaylistView';
 
@@ -18,6 +18,10 @@ interface CandidateListProps {
   onPlaylistSongDrop?: (songId: string) => void;
   /** Callback when "More Like This" is clicked for a candidate */
   onMoreLikeThis?: (spotifyTrackId: string) => void;
+  /** Callback when tag toggle is clicked for a song */
+  onToggleTag?: (spotifyTrackId: string, song: Song) => void;
+  /** Function to check if a song is tagged */
+  isTagged?: (spotifyTrackId: string) => boolean;
 }
 
 /** Data type identifier for drag operations */
@@ -34,6 +38,8 @@ export function CandidateList({
   isAdding = false,
   onPlaylistSongDrop,
   onMoreLikeThis,
+  onToggleTag,
+  isTagged,
 }: CandidateListProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const selectedCount = candidates.filter((c) => c.isSelected).length;
@@ -204,10 +210,12 @@ export function CandidateList({
               e.dataTransfer.setData(CANDIDATE_DRAG_TYPE, candidate.id);
               e.dataTransfer.effectAllowed = 'copy';
             }}
-            className={`p-3 rounded-lg border transition-colors ${
-              candidate.isMatched
-                ? 'bg-white border-gray-200 hover:border-gray-300 cursor-grab active:cursor-grabbing'
-                : 'bg-gray-50 border-gray-100 opacity-60'
+            className={`p-3 rounded-lg border-2 transition-colors ${
+              !candidate.isMatched
+                ? 'bg-gray-50 border-gray-100 opacity-60'
+                : candidate.spotifyTrack && isTagged?.(candidate.spotifyTrack.id)
+                  ? 'bg-amber-50 border-amber-300 hover:border-amber-400 cursor-grab active:cursor-grabbing'
+                  : 'bg-white border-gray-200 hover:border-gray-300 cursor-grab active:cursor-grabbing'
             }`}
           >
             <div className="flex items-start gap-3">
@@ -239,34 +247,72 @@ export function CandidateList({
                   </div>
                 )}
               </div>
-              {/* More Like This button for matched songs */}
-              {candidate.isMatched && onMoreLikeThis && candidate.spotifyTrack && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMoreLikeThis(candidate.spotifyTrack!.id);
-                  }}
-                  className="relative group p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                  aria-label="Get similar song recommendations"
-                >
-                  <svg
-                    className="w-4 h-4 text-gray-400 group-hover:text-purple-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  <div className="absolute right-0 top-6 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
-                    More like this
-                  </div>
-                </button>
+              {/* Action buttons for matched songs */}
+              {candidate.isMatched && candidate.spotifyTrack && (onToggleTag || onMoreLikeThis) && (
+                <div className="flex-shrink-0 flex items-center gap-1">
+                  {/* Tag button */}
+                  {onToggleTag && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleTag(candidate.spotifyTrack!.id, candidate.song);
+                      }}
+                      className={`relative group p-1 rounded transition-colors ${
+                        isTagged?.(candidate.spotifyTrack!.id) ? 'bg-amber-100' : 'hover:bg-gray-100'
+                      }`}
+                      aria-label={isTagged?.(candidate.spotifyTrack!.id) ? 'Remove tag' : 'Tag for prompt generation'}
+                    >
+                      <svg
+                        className={`w-4 h-4 ${
+                          isTagged?.(candidate.spotifyTrack!.id) ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'
+                        }`}
+                        fill={isTagged?.(candidate.spotifyTrack!.id) ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+                        />
+                      </svg>
+                      <div className="absolute right-0 top-6 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
+                        {isTagged?.(candidate.spotifyTrack!.id) ? 'Remove tag' : 'Tag for prompt'}
+                      </div>
+                    </button>
+                  )}
+                  {/* More Like This button */}
+                  {onMoreLikeThis && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoreLikeThis(candidate.spotifyTrack!.id);
+                      }}
+                      className="relative group p-1 rounded hover:bg-gray-100 transition-colors"
+                      aria-label="Get similar song recommendations"
+                    >
+                      <svg
+                        className="w-4 h-4 text-gray-400 group-hover:text-purple-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      <div className="absolute right-0 top-6 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
+                        More like this
+                      </div>
+                    </button>
+                  )}
+                </div>
               )}
               {/* Drag handle indicator for matched songs */}
               {candidate.isMatched && (

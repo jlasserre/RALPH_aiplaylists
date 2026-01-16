@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, DragEvent } from 'react';
-import { CandidateSong } from '@/types';
+import { CandidateSong, Song } from '@/types';
 import { CandidateList, PLAYLIST_SONG_DRAG_TYPE } from '@/components/features/playlist';
 
 interface MiddlePanelProps {
@@ -19,6 +19,10 @@ interface MiddlePanelProps {
   onPlaylistSongDrop?: (songId: string) => void;
   /** Callback when "More Like This" is clicked for a candidate */
   onMoreLikeThis?: (spotifyTrackId: string) => void;
+  /** Callback when tag toggle is clicked for a song */
+  onToggleTag?: (spotifyTrackId: string, song: Song) => void;
+  /** Function to check if a song is tagged */
+  isTagged?: (spotifyTrackId: string) => boolean;
 }
 
 /**
@@ -33,6 +37,8 @@ export function MiddlePanel({
   isAdding = false,
   onPlaylistSongDrop,
   onMoreLikeThis,
+  onToggleTag,
+  isTagged,
 }: MiddlePanelProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -145,6 +151,8 @@ export function MiddlePanel({
           isAdding={isAdding}
           onPlaylistSongDrop={onPlaylistSongDrop}
           onMoreLikeThis={onMoreLikeThis}
+          onToggleTag={onToggleTag}
+          isTagged={isTagged}
         />
       )}
     </div>

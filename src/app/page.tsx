@@ -6,6 +6,7 @@ import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useAuthStore } from '@/store/authStore';
+import { useTagStore } from '@/store/tagStore';
 import { NameConflictDialog } from '@/components/features/playlist';
 import type { ConflictResolution } from '@/components/features/playlist';
 import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
@@ -44,6 +45,10 @@ export default function Home() {
   const setCandidates = useCandidateStore((state) => state.setCandidates);
   const setLoadingCandidates = useCandidateStore((state) => state.setLoading);
   const insertCandidatesAfter = useCandidateStore((state) => state.insertCandidatesAfter);
+
+  // Tag state and actions
+  const toggleTag = useTagStore((state) => state.toggleTag);
+  const isTagged = useTagStore((state) => state.isTagged);
 
   // User playlists state
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
@@ -889,6 +894,8 @@ export default function Home() {
             isLoading={isLoadingCandidates}
             onPlaylistSongDrop={handlePlaylistSongDrop}
             onMoreLikeThis={handleMoreLikeThisFromCandidate}
+            onToggleTag={toggleTag}
+            isTagged={isTagged}
           />
         }
         rightPanel={
@@ -903,6 +910,8 @@ export default function Home() {
             onCandidateDrop={handleCandidateDrop}
             onReorder={reorderSong}
             onMoreLikeThis={handleMoreLikeThisFromPlaylist}
+            onToggleTag={toggleTag}
+            isTagged={isTagged}
           />
         }
       />

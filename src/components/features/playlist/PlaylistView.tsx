@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, DragEvent } from 'react';
-import { PlaylistSong } from '@/types';
+import { PlaylistSong, Song } from '@/types';
 import { Button } from '@/components/ui';
 import { SongCard } from './SongCard';
 import { CANDIDATE_DRAG_TYPE } from './CandidateList';
@@ -28,6 +28,10 @@ interface PlaylistViewProps {
   onReorder?: (fromIndex: number, toIndex: number) => void;
   /** Callback when "More Like This" is clicked for a song */
   onMoreLikeThis?: (spotifyTrackId: string) => void;
+  /** Callback when tag toggle is clicked for a song */
+  onToggleTag?: (spotifyTrackId: string, song: Song) => void;
+  /** Function to check if a song is tagged */
+  isTagged?: (spotifyTrackId: string) => boolean;
 }
 
 /**
@@ -44,6 +48,8 @@ export function PlaylistView({
   onCandidateDrop,
   onReorder,
   onMoreLikeThis,
+  onToggleTag,
+  isTagged,
 }: PlaylistViewProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -335,6 +341,8 @@ export function PlaylistView({
                   onClick={() => onSongClick?.(playlistSong.id)}
                   onMoreLikeThis={onMoreLikeThis}
                   spotifyTrackId={playlistSong.spotifyTrack?.id}
+                  onToggleTag={onToggleTag}
+                  isTagged={playlistSong.spotifyTrack?.id ? isTagged?.(playlistSong.spotifyTrack.id) : false}
                 />
               </div>
             </div>

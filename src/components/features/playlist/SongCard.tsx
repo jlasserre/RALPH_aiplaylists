@@ -21,6 +21,10 @@ interface SongCardProps {
   onMoreLikeThis?: (spotifyTrackId: string) => void;
   /** Spotify track ID for the song (required for More Like This feature) */
   spotifyTrackId?: string;
+  /** Callback when tag toggle is clicked. Receives the Spotify track ID. */
+  onToggleTag?: (spotifyTrackId: string, song: Song) => void;
+  /** Whether the song is currently tagged */
+  isTagged?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -151,6 +155,44 @@ function MoreLikeThisButton({ onClick }: { onClick: () => void }) {
 }
 
 /**
+ * Tag toggle button with tooltip
+ */
+function TagButton({ onClick, isTagged }: { onClick: () => void; isTagged: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`relative group p-1 rounded transition-colors ${
+        isTagged ? 'bg-amber-100' : 'hover:bg-gray-100'
+      }`}
+      aria-label={isTagged ? 'Remove tag' : 'Tag for prompt generation'}
+    >
+      <svg
+        className={`w-4 h-4 ${
+          isTagged ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'
+        }`}
+        fill={isTagged ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+        />
+      </svg>
+      <div className="absolute right-0 top-6 z-10 hidden group-hover:block px-2 py-1 text-xs bg-gray-900 text-white rounded shadow-lg whitespace-nowrap">
+        {isTagged ? 'Remove tag' : 'Tag for prompt'}
+      </div>
+    </button>
+  );
+}
+
+/**
  * SongCard component for displaying song information with state indicators.
  * Used in both CandidateList and PlaylistView components.
  *
@@ -168,22 +210,28 @@ export function SongCard({
   showStateIcon = false,
   onMoreLikeThis,
   spotifyTrackId,
+  onToggleTag,
+  isTagged = false,
   className = '',
 }: SongCardProps) {
   const isMarkedForRemoval = state === 'markedForRemoval';
 
-  // Determine card styling based on state
+  // Determine card styling based on state and tag status
   const cardClasses = [
-    'p-3 rounded-lg border transition-colors',
-    isMarkedForRemoval
-      ? 'bg-red-50 border-red-200'
-      : isMatched
-        ? 'bg-white border-gray-200'
-        : 'bg-gray-50 border-gray-100 opacity-60',
+    'p-3 rounded-lg border-2 transition-colors',
+    isTagged
+      ? 'bg-amber-50 border-amber-300'
+      : isMarkedForRemoval
+        ? 'bg-red-50 border-red-200'
+        : isMatched
+          ? 'bg-white border-gray-200'
+          : 'bg-gray-50 border-gray-100 opacity-60',
     isClickable && isMatched
       ? isMarkedForRemoval
         ? 'hover:border-red-300 cursor-pointer'
-        : 'hover:border-gray-300 cursor-pointer'
+        : isTagged
+          ? 'hover:border-amber-400 cursor-pointer'
+          : 'hover:border-gray-300 cursor-pointer'
       : '',
     className,
   ]
@@ -192,6 +240,9 @@ export function SongCard({
 
   // Determine if More Like This button should show
   const showMoreLikeThis = onMoreLikeThis && spotifyTrackId && isMatched;
+
+  // Determine if Tag button should show
+  const showTagButton = onToggleTag && spotifyTrackId && isMatched;
 
   const content = (
     <div className="flex items-start gap-3">
@@ -239,10 +290,18 @@ export function SongCard({
         )}
       </div>
 
-      {/* More Like This button */}
-      {showMoreLikeThis && (
-        <div className="flex-shrink-0">
-          <MoreLikeThisButton onClick={() => onMoreLikeThis(spotifyTrackId)} />
+      {/* Action buttons */}
+      {(showTagButton || showMoreLikeThis) && (
+        <div className="flex-shrink-0 flex items-center gap-1">
+          {showTagButton && (
+            <TagButton
+              onClick={() => onToggleTag(spotifyTrackId, song)}
+              isTagged={isTagged}
+            />
+          )}
+          {showMoreLikeThis && (
+            <MoreLikeThisButton onClick={() => onMoreLikeThis(spotifyTrackId)} />
+          )}
         </div>
       )}
     </div>
