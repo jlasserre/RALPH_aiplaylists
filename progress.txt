@@ -905,3 +905,21 @@
   - Client-side caching is simpler than server-side - no need to modify API routes, just check cache before calling
   - The `uncachedSongs` array stores both original index and song, allowing proper index mapping when results return
 ---
+
+## 2026-01-16 - US-063
+- What was implemented: Exponential backoff for Spotify rate limiting and server errors
+- Files changed:
+  - src/lib/spotify/backoff.ts - New module with BackoffConfig, calculateBackoffDelay, calculateDelayWithRetryAfter, getBackoffResult, delay, withBackoff
+  - src/lib/spotify/backoff.test.ts - 42 tests for all backoff functions with mocked timers
+  - src/lib/spotify/api.ts - Updated SpotifyClient with SpotifyClientOptions, backoff integration in fetch wrapper, extractRetryAfter helper
+  - src/lib/spotify/api.test.ts - Updated existing tests to use enableRetries: false, added 22 tests for backoff behavior
+- **Learnings for future iterations:**
+  - Use `jest.useFakeTimers()` and `jest.runAllTimersAsync()` for testing async functions with delays
+  - When testing promise rejections with fake timers, use `.catch()` to capture the error before running timers
+  - Exponential backoff formula: min(maxDelay, baseDelay * 2^attempt) + jitter
+  - SpotifyClient now accepts options parameter for configuring backoff and enabling/disabling retries
+  - Default backoff config: maxRetries=3, baseDelayMs=1000, maxDelayMs=30000, jitterFactor=0.1
+  - Existing tests need `enableRetries: false` to preserve their original behavior (immediate error on failure)
+  - Retry logic only applies to 429 (rate limit) and 5xx (server errors), not 4xx client errors
+  - The condition `attempt > maxRetries` (not `>=`) allows the full number of retries to occur
+---
