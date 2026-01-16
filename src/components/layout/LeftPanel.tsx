@@ -1,0 +1,327 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { Button, Input, TextArea } from '@/components/ui';
+import type { UserPlaylist, Song } from '@/types';
+
+/** Tagged song info for prompt generation */
+interface TaggedSong {
+  spotifyTrackId: string;
+  song: Song;
+}
+
+type LLMProvider = 'claude' | 'openai';
+
+interface LeftPanelProps {
+  /** Callback when New Playlist is clicked */
+  onNewPlaylist?: () => void;
+  /** Callback when Load Existing is selected */
+  onLoadExisting?: (playlistId: string) => void;
+  /** Callback when Suggest songs is clicked */
+  onSuggestSongs?: (prompt: string, provider: LLMProvider) => void;
+  /** Callback when cancel generation is clicked */
+  onCancelGeneration?: () => void;
+  /** Callback when playlist name changes */
+  onPlaylistNameChange?: (name: string) => void;
+  /** Controlled playlist name value */
+  playlistName?: string;
+  /** Auto-suggested playlist name (shown as placeholder) */
+  suggestedName?: string;
+  /** Whether generation is in progress */
+  isGenerating?: boolean;
+  /** User's Spotify playlists for "Load Existing" dropdown */
+  userPlaylists?: UserPlaylist[];
+  /** Whether playlists are being loaded */
+  isLoadingPlaylists?: boolean;
+  /** Tagged songs for prompt generation */
+  taggedSongs?: TaggedSong[];
+  /** Callback when tags should be cleared (after using them) */
+  onClearTags?: () => void;
+}
+
+const PROMPT_MIN_LENGTH = 10;
+const PROMPT_MAX_LENGTH = 5000;
+
+/**
+ * Left panel containing playlist controls:
+ * - New Playlist / Load Existing buttons
+ * - LLM provider selector
+ * - Playlist name input
+ * - Prompt textarea
+ * - Suggest songs button
+ */
+export function LeftPanel({
+  onNewPlaylist,
+  onLoadExisting,
+  onSuggestSongs,
+  onCancelGeneration,
+  onPlaylistNameChange,
+  playlistName = '',
+  suggestedName,
+  isGenerating = false,
+  userPlaylists = [],
+  isLoadingPlaylists = false,
+  taggedSongs = [],
+  onClearTags,
+}: LeftPanelProps) {
+  const [prompt, setPrompt] = useState('');
+  const [llmProvider, setLLMProvider] = useState<LLMProvider>('claude');
+  // Track if the current prompt was auto-generated from tags
+  const [isPromptFromTags, setIsPromptFromTags] = useState(false);
+  // Track the last tag count to detect tag changes
+  const lastTagCountRef = useRef(0);
+
+  /**
+   * Handle New Playlist click - clears prompt and calls parent handler
+   */
+  const handleNewPlaylist = () => {
+    setPrompt('');
+    onNewPlaylist?.();
+  };
+
+  const handleSuggestSongs = () => {
+    if (prompt.length >= PROMPT_MIN_LENGTH) {
+      onSuggestSongs?.(prompt, llmProvider);
+    }
+  };
+
+  /**
+   * Generate a prompt string from the tagged songs
+   */
+  const generatePromptFromTags = (songs: TaggedSong[]): string => {
+    if (songs.length === 0) return '';
+    const songDescriptions = songs.map(
+      (tagged) => `"${tagged.song.title}" by ${tagged.song.artist}`
+    );
+    return `Songs similar to ${songDescriptions.join(', ')}`;
+  };
+
+  /**
+   * Handle Generate Prompt from Tags click
+   * Generates prompt, sets it in textarea, marks as from tags, and clears tags
+   */
+  const handleGenerateFromTags = () => {
+    if (taggedSongs.length === 0) return;
+
+    const generatedPrompt = generatePromptFromTags(taggedSongs);
+    setPrompt(generatedPrompt);
+    setIsPromptFromTags(true);
+    lastTagCountRef.current = 0; // Reset since we're clearing
+    onClearTags?.();
+  };
+
+  /**
+   * Handle manual prompt changes
+   * If user edits the prompt manually, disable auto-update from tags
+   */
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrompt(e.target.value);
+    // Any manual edit disables the auto-update
+    if (isPromptFromTags) {
+      setIsPromptFromTags(false);
+    }
+  };
+
+  /**
+   * Auto-update prompt when tags change (only if prompt was generated from tags)
+   */
+  useEffect(() => {
+    // If prompt is from tags and tags have changed, regenerate
+    if (isPromptFromTags && taggedSongs.length !== lastTagCountRef.current) {
+      if (taggedSongs.length > 0) {
+        // Update prompt with new tags
+        const updatedPrompt = generatePromptFromTags(taggedSongs);
+        setPrompt(updatedPrompt);
+      } else {
+        // All tags removed, clear the prompt
+        setPrompt('');
+        setIsPromptFromTags(false);
+      }
+    }
+    lastTagCountRef.current = taggedSongs.length;
+  }, [taggedSongs, isPromptFromTags]);
+
+  const isPromptValid = prompt.length >= PROMPT_MIN_LENGTH;
+  const promptError =
+    prompt.length > 0 && prompt.length < PROMPT_MIN_LENGTH
+      ? `Prompt must be at least ${PROMPT_MIN_LENGTH} characters`
+      : undefined;
+
+  return (
+    <div className="space-y-6">
+      {/* Playlist Actions */}
+      <div className="space-y-2">
+        <Button
+          variant="primary"
+          size="sm"
+          className="w-full"
+          onClick={handleNewPlaylist}
+        >
+          New Playlist
+        </Button>
+        <div className="relative">
+          <select
+            className="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-1.5 pr-8 text-sm text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-500"
+            onChange={(e) => {
+              if (e.target.value) {
+                onLoadExisting?.(e.target.value);
+                e.target.value = '';
+              }
+            }}
+            defaultValue=""
+            disabled={isLoadingPlaylists}
+          >
+            <option value="" disabled>
+              {isLoadingPlaylists ? 'Loading playlists...' : 'Load Existing...'}
+            </option>
+            {userPlaylists.map((playlist) => (
+              <option key={playlist.id} value={playlist.id}>
+                {playlist.isOwned ? '' : '🔒 '}{playlist.name} ({playlist.tracks.total} tracks)
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <hr className="border-gray-200" />
+
+      {/* LLM Provider Selector */}
+      <div>
+        <label
+          htmlFor="llm-provider"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          LLM Provider
+        </label>
+        <div className="relative">
+          <select
+            id="llm-provider"
+            value={llmProvider}
+            onChange={(e) => setLLMProvider(e.target.value as LLMProvider)}
+            className="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 pr-8 text-gray-900 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="claude">Claude</option>
+            <option value="openai">OpenAI</option>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Playlist Name */}
+      <Input
+        label="Playlist Name"
+        placeholder={suggestedName || 'Enter playlist name...'}
+        value={playlistName}
+        onChange={(e) => onPlaylistNameChange?.(e.target.value)}
+        maxLength={100}
+      />
+      {suggestedName && !playlistName && (
+        <p className="text-xs text-gray-500 -mt-4">
+          Suggested: &quot;{suggestedName}&quot; (leave blank to use)
+        </p>
+      )}
+
+      {/* Generate from Tags Button - shown when songs are tagged */}
+      {taggedSongs.length > 0 && (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full"
+          onClick={handleGenerateFromTags}
+        >
+          <svg
+            className="w-4 h-4 mr-2 inline-block"
+            fill="currentColor"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+            />
+          </svg>
+          Generate Prompt from {taggedSongs.length} Tagged {taggedSongs.length === 1 ? 'Song' : 'Songs'}
+        </Button>
+      )}
+
+      {/* Prompt Textarea */}
+      <TextArea
+        label="Prompt"
+        placeholder="Describe the music you want... (e.g., 'upbeat 90s pop songs for a road trip')"
+        value={prompt}
+        onChange={handlePromptChange}
+        minLength={PROMPT_MIN_LENGTH}
+        maxLength={PROMPT_MAX_LENGTH}
+        showCharacterCount
+        error={promptError}
+        hint={!promptError ? `Minimum ${PROMPT_MIN_LENGTH} characters` : undefined}
+        rows={4}
+      />
+
+      {/* Suggest Songs / Cancel Button */}
+      {isGenerating ? (
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={onCancelGeneration}
+        >
+          <svg
+            className="w-4 h-4 mr-2 inline-block"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+          Cancel Generation
+        </Button>
+      ) : (
+        <Button
+          variant="primary"
+          className="w-full"
+          onClick={handleSuggestSongs}
+          disabled={!isPromptValid}
+        >
+          Suggest songs
+        </Button>
+      )}
+    </div>
+  );
+}
