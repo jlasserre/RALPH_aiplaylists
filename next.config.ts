@@ -28,8 +28,6 @@ const nextConfig: NextConfig = {
               "frame-ancestors 'none'",
               // Base URI restricted to self
               "base-uri 'self'",
-              // Enable Trusted Types
-              "require-trusted-types-for 'script'",
             ].join("; "),
           },
           {
