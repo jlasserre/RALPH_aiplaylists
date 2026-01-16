@@ -752,8 +752,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 44,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added refresh arrow icon button to SongCard and CandidateList for matched songs. Created /api/spotify/recommendations endpoint. Added insertCandidatesAfter action to candidateStore that inserts songs after a specific candidate with auto-selection. Button visible on playlist songs; clicking triggers handler (requires Spotify auth to fetch recommendations). 6 new tests for insertCandidatesAfter."
     },
     {
       "id": "US-045",

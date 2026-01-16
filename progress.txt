@@ -665,3 +665,24 @@
   - Drop handlers need to be on the outermost container div to capture drops anywhere in the panel, not just on child components
   - Red color scheme (bg-red-50, border-red-400, text-red-700) for destructive drop actions vs blue for constructive
 ---
+
+## 2026-01-15 - US-044
+- What was implemented: "More Like This" feature to get similar song recommendations
+- Files changed:
+  - src/app/api/spotify/recommendations/route.ts - New POST endpoint that calls SpotifyClient.getRecommendations with seedTrackId
+  - src/store/candidateStore.ts - Added insertCandidatesAfter action that inserts songs after a specific candidate, auto-selecting matched songs
+  - src/store/candidateStore.test.ts - Added 6 tests for insertCandidatesAfter (ordering, auto-selection, unique IDs, edge cases)
+  - src/components/features/playlist/SongCard.tsx - Added MoreLikeThisButton component (refresh icon), onMoreLikeThis and spotifyTrackId props
+  - src/components/features/playlist/CandidateList.tsx - Added inline "More Like This" button for matched candidates
+  - src/components/features/playlist/PlaylistView.tsx - Added onMoreLikeThis prop, passed to SongCard with spotifyTrackId
+  - src/components/layout/MiddlePanel.tsx - Added onMoreLikeThis prop pass-through
+  - src/components/layout/RightPanel.tsx - Added onMoreLikeThis prop pass-through
+  - src/app/page.tsx - Added handleMoreLikeThis, handleMoreLikeThisFromCandidate, handleMoreLikeThisFromPlaylist callbacks
+- **Learnings for future iterations:**
+  - Use insertCandidatesAfter with auto-selection for "More Like This" to immediately make recommendations actionable
+  - For candidates: insert after source song so user can see context
+  - For playlist songs: insert at beginning of candidates (prepend) since there's no direct source in candidates
+  - The refresh/circular arrows icon is a common UX pattern for "get similar items"
+  - Always show button conditionally: `onMoreLikeThis && spotifyTrackId && isMatched` ensures it only appears when functional
+  - Next.js dev server caches aggressively - sometimes need to clear .next and restart for component changes
+---
