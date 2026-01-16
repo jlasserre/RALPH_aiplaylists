@@ -22,7 +22,8 @@ describe('SpotifyClient', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    client = new SpotifyClient('test-access-token');
+    // Disable retries for basic tests to preserve original behavior
+    client = new SpotifyClient('test-access-token', { enableRetries: false });
   });
 
   describe('constructor', () => {
@@ -644,7 +645,7 @@ describe('SpotifyClient.searchTrack', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    client = new SpotifyClient('test-access-token');
+    client = new SpotifyClient('test-access-token', { enableRetries: false });
   });
 
   it('should find exact match', async () => {
@@ -905,7 +906,7 @@ describe('SpotifyClient.getRecommendations', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    client = new SpotifyClient('test-access-token');
+    client = new SpotifyClient('test-access-token', { enableRetries: false });
   });
 
   it('should get recommendations for a seed track', async () => {
@@ -1152,7 +1153,7 @@ describe('SpotifyClient.getUserPlaylists', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
-    client = new SpotifyClient('test-access-token');
+    client = new SpotifyClient('test-access-token', { enableRetries: false });
   });
 
   it('should fetch user playlists', async () => {
@@ -1657,7 +1658,7 @@ describe('SpotifyClient.getPlaylistTracks', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
-    client = new SpotifyClient('test-access-token');
+    client = new SpotifyClient('test-access-token', { enableRetries: false });
   });
 
   it('should fetch tracks from a playlist', async () => {
@@ -1994,5 +1995,423 @@ describe('SpotifyClient.getPlaylistTracks', () => {
     expect(result[0].name).toBe('Test Song');
     expect(result[0].artists[0].name).toBe('Test Artist');
     expect(result[0].album.name).toBe('Album for Test Song');
+  });
+});
+
+describe('SpotifyClient - Exponential Backoff', () => {
+  let client: SpotifyClient;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  describe('Rate limiting (429) retries', () => {
+    it('should retry on 429 and succeed on second attempt', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      // First call: 429 rate limit
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '1' }),
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      // Second call: success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: 'success' }),
+      });
+
+      const resultPromise = client.get('/test');
+
+      // Advance past the Retry-After delay (1 second)
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use Retry-After header for delay', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      // First call: 429 with 5 second Retry-After
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '5' }),
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      // Second call: success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: 'success' }),
+      });
+
+      const resultPromise = client.get('/test');
+
+      // Advance 4 seconds - should not retry yet
+      await jest.advanceTimersByTimeAsync(4000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Advance 1 more second - should now retry
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw SpotifyRateLimitError after max retries', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 2 } });
+
+      // All calls: 429 rate limit
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '1' }),
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      // Capture the error
+      let caughtError: Error | undefined;
+      const resultPromise = client.get('/test').catch((e) => {
+        caughtError = e;
+      });
+
+      // Advance through all retries using runAllTimersAsync
+      await jest.runAllTimersAsync();
+      await resultPromise;
+
+      expect(caughtError).toBeInstanceOf(SpotifyRateLimitError);
+      expect(mockFetch).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+    });
+  });
+
+  describe('Server error (5xx) retries', () => {
+    it('should retry on 500 and succeed on second attempt', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      // First call: 500 server error
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Internal server error' } }),
+      });
+
+      // Second call: success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: 'success' }),
+      });
+
+      const resultPromise = client.get('/test');
+
+      // Advance past exponential backoff delay (1 second for first retry)
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on 502 and succeed', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 502,
+          headers: new Headers(),
+          json: async () => ({ error: { message: 'Bad gateway' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: 'success' }),
+        });
+
+      const resultPromise = client.get('/test');
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on 503 and succeed', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          headers: new Headers(),
+          json: async () => ({ error: { message: 'Service unavailable' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: 'success' }),
+        });
+
+      const resultPromise = client.get('/test');
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw SpotifyAPIError after max retries on 500', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 2 } });
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Internal server error' } }),
+      });
+
+      // Capture the error
+      let caughtError: Error | undefined;
+      const resultPromise = client.get('/test').catch((e) => {
+        caughtError = e;
+      });
+
+      // Advance through all retries using runAllTimersAsync
+      await jest.runAllTimersAsync();
+      await resultPromise;
+
+      expect(caughtError).toBeInstanceOf(SpotifyAPIError);
+      expect(mockFetch).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+    });
+  });
+
+  describe('Non-retryable errors', () => {
+    it('should not retry on 400 error', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Bad request' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyAPIError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry on 401 error', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Unauthorized' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyAuthError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry on 403 error', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Forbidden' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyAPIError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry on 404 error', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 3 } });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Not found' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyAPIError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Exponential backoff delays', () => {
+    it('should use exponential backoff for multiple retries', async () => {
+      client = new SpotifyClient('test-token', {
+        backoff: { maxRetries: 3, baseDelayMs: 1000, jitterFactor: 0 },
+      });
+
+      // All calls fail except last
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          json: async () => ({ error: { message: 'Error' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          json: async () => ({ error: { message: 'Error' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: 'success' }),
+        });
+
+      const resultPromise = client.get('/test');
+
+      // First retry after 1000ms (2^0 * 1000)
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Second retry after 2000ms (2^1 * 1000)
+      await jest.advanceTimersByTimeAsync(2000);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+    });
+  });
+
+  describe('Disable retries', () => {
+    it('should not retry when enableRetries is false', async () => {
+      client = new SpotifyClient('test-token', { enableRetries: false });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '1' }),
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyRateLimitError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry 500 when enableRetries is false', async () => {
+      client = new SpotifyClient('test-token', { enableRetries: false });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        json: async () => ({ error: { message: 'Server error' } }),
+      });
+
+      await expect(client.get('/test')).rejects.toThrow(SpotifyAPIError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Custom backoff configuration', () => {
+    it('should use custom maxRetries', async () => {
+      client = new SpotifyClient('test-token', { backoff: { maxRetries: 1 } });
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'Retry-After': '1' }),
+        json: async () => ({ error: { message: 'Rate limited' } }),
+      });
+
+      // Capture the error
+      let caughtError: Error | undefined;
+      const resultPromise = client.get('/test').catch((e) => {
+        caughtError = e;
+      });
+
+      // Advance through all retries using runAllTimersAsync
+      await jest.runAllTimersAsync();
+      await resultPromise;
+
+      expect(caughtError).toBeInstanceOf(SpotifyRateLimitError);
+      expect(mockFetch).toHaveBeenCalledTimes(2); // 1 initial + 1 retry
+    });
+
+    it('should use custom baseDelayMs', async () => {
+      client = new SpotifyClient('test-token', {
+        backoff: { maxRetries: 3, baseDelayMs: 500, jitterFactor: 0 },
+      });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          headers: new Headers(),
+          json: async () => ({ error: { message: 'Error' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: 'success' }),
+        });
+
+      const resultPromise = client.get('/test');
+
+      // Should wait 500ms for first retry (not 1000ms default)
+      await jest.advanceTimersByTimeAsync(500);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Missing Retry-After header', () => {
+    it('should use exponential backoff when Retry-After is missing', async () => {
+      client = new SpotifyClient('test-token', {
+        backoff: { maxRetries: 3, baseDelayMs: 1000, jitterFactor: 0 },
+      });
+
+      // 429 without Retry-After header
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers(), // No Retry-After
+          json: async () => ({ error: { message: 'Rate limited' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: 'success' }),
+        });
+
+      const resultPromise = client.get('/test');
+
+      // Should use exponential backoff (1000ms for first retry)
+      await jest.advanceTimersByTimeAsync(1000);
+
+      const result = await resultPromise;
+      expect(result).toEqual({ data: 'success' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 });

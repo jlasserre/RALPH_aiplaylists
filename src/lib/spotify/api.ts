@@ -4,6 +4,12 @@
  */
 
 import type { SpotifyTrack, UserPlaylist } from '@/types';
+import {
+  type BackoffConfig,
+  DEFAULT_BACKOFF_CONFIG,
+  getBackoffResult,
+  delay,
+} from './backoff';
 
 /**
  * Spotify search response type
@@ -216,30 +222,45 @@ export function fuzzyMatch(
 }
 
 /**
+ * Options for SpotifyClient configuration
+ */
+export interface SpotifyClientOptions {
+  /** Configuration for exponential backoff retry logic */
+  backoff?: BackoffConfig;
+  /** Whether to enable automatic retries for rate limiting and server errors (default: true) */
+  enableRetries?: boolean;
+}
+
+/**
  * Client for interacting with the Spotify Web API
  */
 export class SpotifyClient {
   private accessToken: string;
+  private backoffConfig: BackoffConfig;
+  private enableRetries: boolean;
 
   /**
    * Creates a new SpotifyClient instance
    * @param accessToken - Spotify access token for authentication
+   * @param options - Client configuration options
    */
-  constructor(accessToken: string) {
+  constructor(accessToken: string, options: SpotifyClientOptions = {}) {
     if (!accessToken) {
       throw new Error('Access token is required');
     }
     this.accessToken = accessToken;
+    this.backoffConfig = options.backoff ?? DEFAULT_BACKOFF_CONFIG;
+    this.enableRetries = options.enableRetries ?? true;
   }
 
   /**
-   * Makes an authenticated request to the Spotify API
+   * Makes an authenticated request to the Spotify API with exponential backoff retry
    * @param endpoint - API endpoint (without base URL)
    * @param options - Fetch options
    * @returns Response data as JSON
    * @throws SpotifyAuthError on 401 responses
-   * @throws SpotifyRateLimitError on 429 responses
-   * @throws SpotifyAPIError on other error responses
+   * @throws SpotifyRateLimitError on 429 responses (after retries exhausted)
+   * @throws SpotifyAPIError on other error responses (5xx retried, 4xx not retried)
    */
   private async fetch<T>(
     endpoint: string,
@@ -247,26 +268,89 @@ export class SpotifyClient {
   ): Promise<T> {
     const url = `${SPOTIFY_API_BASE_URL}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+    let lastStatusCode: number | undefined;
+    let lastRetryAfter: number | null = null;
+    let attempt = 1;
+    const maxAttempts = this.enableRetries ? (this.backoffConfig.maxRetries ?? DEFAULT_BACKOFF_CONFIG.maxRetries) + 1 : 1;
 
-    // Handle error responses
-    if (!response.ok) {
-      await this.handleErrorResponse(response);
+    while (attempt <= maxAttempts) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      // Handle successful responses
+      if (response.ok) {
+        // Handle empty responses (e.g., DELETE requests)
+        if (response.status === 204) {
+          return {} as T;
+        }
+        return response.json();
+      }
+
+      // Check if we should retry
+      const statusCode = response.status;
+      const retryAfter = this.extractRetryAfter(response);
+
+      // Store for potential error creation after loop
+      lastStatusCode = statusCode;
+      lastRetryAfter = retryAfter;
+
+      // For auth errors, don't retry - throw immediately
+      if (statusCode === 401) {
+        throw new SpotifyAuthError();
+      }
+
+      // Determine if this error is retryable
+      const isRetryableStatus = statusCode === 429 || statusCode >= 500;
+      const backoffResult = getBackoffResult(
+        attempt,
+        statusCode,
+        retryAfter,
+        this.backoffConfig
+      );
+
+      // If not retryable status or retries disabled or exhausted, throw immediately
+      if (!this.enableRetries || !isRetryableStatus || !backoffResult.shouldRetry) {
+        await this.handleErrorResponse(response);
+      }
+
+      // Wait before retrying
+      await delay(backoffResult.delayMs);
+      attempt++;
     }
 
-    // Handle empty responses (e.g., DELETE requests)
-    if (response.status === 204) {
-      return {} as T;
+    // All retries exhausted, throw the appropriate error
+    if (lastStatusCode === 429) {
+      throw new SpotifyRateLimitError(
+        'Rate limit exceeded. Please try again later.',
+        lastRetryAfter
+      );
     }
 
-    return response.json();
+    throw new SpotifyAPIError(
+      `Spotify API error: ${lastStatusCode} (after ${maxAttempts} attempts)`,
+      lastStatusCode ?? 500,
+      true
+    );
+  }
+
+  /**
+   * Extracts Retry-After header value in seconds
+   * @param response - Fetch response
+   * @returns Retry-After value in seconds or null
+   */
+  private extractRetryAfter(response: Response): number | null {
+    const retryAfterHeader = response.headers.get('Retry-After');
+    if (retryAfterHeader) {
+      const value = parseInt(retryAfterHeader, 10);
+      return isNaN(value) ? null : value;
+    }
+    return null;
   }
 
   /**
