@@ -870,3 +870,21 @@
   - frame-ancestors 'none' in CSP is redundant with X-Frame-Options: DENY but provides defense-in-depth
   - Trusted Types enabled with require-trusted-types-for 'script' helps prevent DOM XSS
 ---
+
+## 2026-01-16 - US-061
+- What was implemented: Wired up main page with all components, auth initialization, and login prompt for unauthenticated users
+- Files changed:
+  - src/app/page.tsx - Changed from useAuthStore to useSpotifyAuth hook for auto-refresh on mount, added showLoginPrompt condition, added login prompt overlay
+- **Implementation details:**
+  - Login prompt overlay shows when: isHydrated && !isAuthLoading && !isAuthenticated
+  - Overlay includes: Spotify logo, "Welcome to AI Playlist Generator" heading, app description, feature highlights (AI-Powered Suggestions, Direct Spotify Integration), "Log in with Spotify" button, permission note
+  - Uses backdrop-blur-sm and bg-gray-900/50 for dimmed background effect
+  - All stores remain connected: playlistStore, candidateStore, tagStore, authStore (via useSpotifyAuth hook)
+  - Auth status shown in header: SpotifyLoginButton when not authenticated, AuthStatus when authenticated
+- **Learnings for future iterations:**
+  - useSpotifyAuth hook triggers auth refresh on mount via useEffect - using this hook instead of direct store access ensures proper initialization
+  - When multiple components use useSpotifyAuth, the hasAttemptedRefresh flag prevents duplicate API calls
+  - Auth state transitions: isAuthLoading starts false → becomes true during refresh → becomes false when complete
+  - The showLoginPrompt condition must wait for both hydration AND auth check completion to avoid flicker
+  - Trusted Types CSP policy (require-trusted-types-for 'script') causes console errors in dev mode but doesn't break React rendering
+---
