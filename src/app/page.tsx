@@ -70,6 +70,10 @@ export default function Home() {
   // Generation abort controller (for cancel button)
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Suggested playlist name state (auto-suggested after first generation)
+  const [suggestedName, setSuggestedName] = useState<string | null>(null);
+  const hasGeneratedRef = useRef(false); // Track if we've done at least one generation
+
   // Name conflict dialog state
   const [conflictDialog, setConflictDialog] = useState<{
     isOpen: boolean;
@@ -444,6 +448,25 @@ export default function Home() {
                 } else if (eventType === 'complete') {
                   // All searches complete - isLoading will be set to false by updateCandidate
                   console.log(`Search complete, match rate: ${data.matchRate.toFixed(1)}%`);
+
+                  // Auto-suggest playlist name on first generation (fire and forget)
+                  if (!hasGeneratedRef.current && !playlistName) {
+                    hasGeneratedRef.current = true;
+                    fetch('/api/generate/suggest-name', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ prompt, provider }),
+                    })
+                      .then((res) => res.ok ? res.json() : null)
+                      .then((data) => {
+                        if (data?.name) {
+                          setSuggestedName(data.name);
+                        }
+                      })
+                      .catch(() => {
+                        // Ignore errors - name suggestion is optional
+                      });
+                  }
                 } else if (eventType === 'error') {
                   console.error('Stream error:', data.message);
                   setLoadingCandidates(false);
@@ -472,7 +495,7 @@ export default function Home() {
         abortControllerRef.current = null;
       }
     },
-    [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate]
+    [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate, playlistName]
   );
 
   /**
@@ -741,8 +764,8 @@ export default function Home() {
       return;
     }
 
-    // Use a default name if none provided
-    const finalName = playlistName.trim() || 'My AI Playlist';
+    // Use suggested name or default if no name provided
+    const finalName = playlistName.trim() || suggestedName || 'My AI Playlist';
 
     // Get track URIs for all pending songs
     const trackUris = pendingSongs
@@ -782,6 +805,7 @@ export default function Home() {
     accessToken,
     songs,
     playlistName,
+    suggestedName,
     findConflictingPlaylist,
     createPlaylistOnSpotify,
     finalizePlaylistCreation,
@@ -978,6 +1002,7 @@ export default function Home() {
             onCancelGeneration={handleCancelGeneration}
             onPlaylistNameChange={setName}
             playlistName={playlistName}
+            suggestedName={suggestedName ?? undefined}
             isGenerating={isLoadingCandidates}
             userPlaylists={userPlaylists}
             isLoadingPlaylists={isLoadingPlaylists}

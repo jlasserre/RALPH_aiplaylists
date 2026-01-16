@@ -25,6 +25,8 @@ interface LeftPanelProps {
   onPlaylistNameChange?: (name: string) => void;
   /** Controlled playlist name value */
   playlistName?: string;
+  /** Auto-suggested playlist name (shown as placeholder) */
+  suggestedName?: string;
   /** Whether generation is in progress */
   isGenerating?: boolean;
   /** User's Spotify playlists for "Load Existing" dropdown */
@@ -55,6 +57,7 @@ export function LeftPanel({
   onCancelGeneration,
   onPlaylistNameChange,
   playlistName = '',
+  suggestedName,
   isGenerating = false,
   userPlaylists = [],
   isLoadingPlaylists = false,
@@ -237,11 +240,16 @@ export function LeftPanel({
       {/* Playlist Name */}
       <Input
         label="Playlist Name"
-        placeholder="Enter playlist name..."
+        placeholder={suggestedName || 'Enter playlist name...'}
         value={playlistName}
         onChange={(e) => onPlaylistNameChange?.(e.target.value)}
         maxLength={100}
       />
+      {suggestedName && !playlistName && (
+        <p className="text-xs text-gray-500 -mt-4">
+          Suggested: &quot;{suggestedName}&quot; (leave blank to use)
+        </p>
+      )}
 
       {/* Generate from Tags Button - shown when songs are tagged */}
       {taggedSongs.length > 0 && (
