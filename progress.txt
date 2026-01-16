@@ -808,3 +808,15 @@
   - suggestedName can be used as a fallback in the save logic without requiring the user to explicitly accept it
 ---
 
+
+## 2026-01-16 - US-052
+- What was implemented: Added active playlist indicator in header
+- Files changed:
+  - src/app/page.tsx - Added isHydrated state and useEffect for SSR/CSR hydration handling, added green pill indicator with Spotify icon next to title that links to playlist
+- **Learnings for future iterations:**
+  - Zustand persist middleware causes SSR/CSR mismatch - initial server render has empty store state
+  - Use isHydrated state pattern: `const [isHydrated, setIsHydrated] = useState(false); useEffect(() => setIsHydrated(true), []);`
+  - Only render hydration-dependent content when isHydrated is true
+  - Spotify playlist URLs follow format: https://open.spotify.com/playlist/{playlistId}
+---
+

@@ -880,8 +880,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 52,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added green pill indicator in header with Spotify icon and playlist name. Clicking opens playlist in Spotify. Added isHydrated state to handle SSR/CSR mismatch with Zustand persist middleware."
     },
     {
       "id": "US-053",
