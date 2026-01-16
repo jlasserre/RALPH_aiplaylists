@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useTagStore } from '@/store/tagStore';
 import { NameConflictDialog } from '@/components/features/playlist';
 import type { ConflictResolution } from '@/components/features/playlist';
+import { SpotifyLoginButton, AuthStatus } from '@/components/features/auth';
 import type { UserPlaylist, SpotifyTrack, Song, LLMProvider, PlaylistCreateResponse } from '@/types';
 import { ErrorBanner } from '@/components/ui';
 import type { ErrorType } from '@/components/ui';
@@ -1083,7 +1084,14 @@ export default function Home() {
                 )}
               </div>
               <div className="text-sm text-gray-500">
-                {/* Auth status will go here */}
+                {/* Auth status - show login button or user info */}
+                {isHydrated && (
+                  isAuthenticated ? (
+                    <AuthStatus />
+                  ) : (
+                    <SpotifyLoginButton />
+                  )
+                )}
               </div>
             </div>
 
