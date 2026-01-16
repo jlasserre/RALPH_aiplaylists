@@ -83,17 +83,37 @@ export const usePlaylistStore = create<PlaylistStore>()(
         }),
 
       addSongs: (songs) =>
-        set((state) => ({
-          songs: [
-            ...state.songs,
-            ...songs.map((item) => ({
-              id: generateSongId(),
-              song: item.song,
-              spotifyTrack: item.spotifyTrack,
-              state: 'pending' as const,
-            })),
-          ],
-        })),
+        set((state) => {
+          // Get existing Spotify track IDs for duplicate detection
+          // Exclude songs marked for removal as they won't be in the final playlist
+          const existingTrackIds = new Set(
+            state.songs
+              .filter((s) => s.spotifyTrack && s.state !== 'markedForRemoval')
+              .map((s) => s.spotifyTrack!.id)
+          );
+
+          return {
+            songs: [
+              ...state.songs,
+              ...songs.map((item) => {
+                const isDuplicate = item.spotifyTrack
+                  ? existingTrackIds.has(item.spotifyTrack.id)
+                  : false;
+                // Add to set for subsequent duplicates within the same batch
+                if (item.spotifyTrack) {
+                  existingTrackIds.add(item.spotifyTrack.id);
+                }
+                return {
+                  id: generateSongId(),
+                  song: item.song,
+                  spotifyTrack: item.spotifyTrack,
+                  state: 'pending' as const,
+                  isDuplicate,
+                };
+              }),
+            ],
+          };
+        }),
 
       toggleRemoval: (songId: string) =>
         set((state) => ({

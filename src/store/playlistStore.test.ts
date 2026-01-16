@@ -178,6 +178,64 @@ describe('playlistStore', () => {
       expect(songs[0].spotifyTrack).not.toBeNull();
       expect(songs[0].spotifyTrack?.uri).toBe('spotify:track:Test_Song');
     });
+
+    it('should mark duplicate songs when adding same song twice', () => {
+      const testSong = createTestSong('Duplicate Song', 'Test Artist');
+
+      // Add the song once
+      usePlaylistStore.getState().addSongs([testSong]);
+
+      // Add the same song again
+      usePlaylistStore.getState().addSongs([testSong]);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(2);
+      expect(songs[0].isDuplicate).toBe(false);
+      expect(songs[1].isDuplicate).toBe(true);
+    });
+
+    it('should mark duplicates within the same batch', () => {
+      const testSong = createTestSong('Same Song', 'Same Artist');
+
+      // Add the same song twice in one batch
+      usePlaylistStore.getState().addSongs([testSong, testSong]);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(2);
+      expect(songs[0].isDuplicate).toBe(false);
+      expect(songs[1].isDuplicate).toBe(true);
+    });
+
+    it('should not mark different songs as duplicates', () => {
+      const song1 = createTestSong('Song 1', 'Artist 1');
+      const song2 = createTestSong('Song 2', 'Artist 2');
+
+      usePlaylistStore.getState().addSongs([song1, song2]);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(2);
+      expect(songs[0].isDuplicate).toBe(false);
+      expect(songs[1].isDuplicate).toBe(false);
+    });
+
+    it('should not count markedForRemoval songs as duplicates', () => {
+      const testSong = createTestSong('Will Be Removed', 'Test Artist');
+
+      // Add and mark for removal
+      usePlaylistStore.getState().addSongs([testSong]);
+      usePlaylistStore.setState((state) => ({
+        songs: state.songs.map((s) => ({ ...s, state: 'synced' as const })),
+      }));
+      usePlaylistStore.getState().toggleRemoval(usePlaylistStore.getState().songs[0].id);
+
+      // Add same song again - should not be marked as duplicate since original is markedForRemoval
+      usePlaylistStore.getState().addSongs([testSong]);
+
+      const { songs } = usePlaylistStore.getState();
+      expect(songs).toHaveLength(2);
+      expect(songs[0].state).toBe('markedForRemoval');
+      expect(songs[1].isDuplicate).toBe(false);
+    });
   });
 
   describe('toggleRemoval', () => {

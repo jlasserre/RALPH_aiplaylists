@@ -59,6 +59,7 @@ export function PlaylistView({
   const markedForRemovalCount = songs.filter(
     (s) => s.state === 'markedForRemoval'
   ).length;
+  const duplicateCount = songs.filter((s) => s.isDuplicate).length;
   const hasChanges = pendingCount > 0 || markedForRemovalCount > 0;
 
   /**
@@ -280,6 +281,30 @@ export function PlaylistView({
         </div>
       )}
 
+      {/* Duplicate warning banner */}
+      {duplicateCount > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-800 text-sm">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span>
+              {duplicateCount} duplicate {duplicateCount === 1 ? 'song' : 'songs'} in your playlist.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Song count header */}
       <div className="mb-3 text-sm text-gray-600">
         {songs.length} {songs.length === 1 ? 'song' : 'songs'}
@@ -343,6 +368,7 @@ export function PlaylistView({
                   spotifyTrackId={playlistSong.spotifyTrack?.id}
                   onToggleTag={onToggleTag}
                   isTagged={playlistSong.spotifyTrack?.id ? isTagged?.(playlistSong.spotifyTrack.id) : false}
+                  isDuplicate={playlistSong.isDuplicate}
                 />
               </div>
             </div>

@@ -25,6 +25,8 @@ interface SongCardProps {
   onToggleTag?: (spotifyTrackId: string, song: Song) => void;
   /** Whether the song is currently tagged */
   isTagged?: boolean;
+  /** Whether this song is a duplicate of another in the playlist */
+  isDuplicate?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -212,26 +214,31 @@ export function SongCard({
   spotifyTrackId,
   onToggleTag,
   isTagged = false,
+  isDuplicate = false,
   className = '',
 }: SongCardProps) {
   const isMarkedForRemoval = state === 'markedForRemoval';
 
-  // Determine card styling based on state and tag status
+  // Determine card styling based on state, tag status, and duplicate status
   const cardClasses = [
     'p-3 rounded-lg border-2 transition-colors',
-    isTagged
-      ? 'bg-amber-50 border-amber-300'
-      : isMarkedForRemoval
-        ? 'bg-red-50 border-red-200'
-        : isMatched
-          ? 'bg-white border-gray-200'
-          : 'bg-gray-50 border-gray-100 opacity-60',
+    isDuplicate
+      ? 'bg-orange-50 border-orange-300'
+      : isTagged
+        ? 'bg-amber-50 border-amber-300'
+        : isMarkedForRemoval
+          ? 'bg-red-50 border-red-200'
+          : isMatched
+            ? 'bg-white border-gray-200'
+            : 'bg-gray-50 border-gray-100 opacity-60',
     isClickable && isMatched
-      ? isMarkedForRemoval
-        ? 'hover:border-red-300 cursor-pointer'
-        : isTagged
-          ? 'hover:border-amber-400 cursor-pointer'
-          : 'hover:border-gray-300 cursor-pointer'
+      ? isDuplicate
+        ? 'hover:border-orange-400 cursor-pointer'
+        : isMarkedForRemoval
+          ? 'hover:border-red-300 cursor-pointer'
+          : isTagged
+            ? 'hover:border-amber-400 cursor-pointer'
+            : 'hover:border-gray-300 cursor-pointer'
       : '',
     className,
   ]
@@ -268,6 +275,11 @@ export function SongCard({
           {!isMatched && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
               Not found
+            </span>
+          )}
+          {isDuplicate && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-200 text-orange-700">
+              Duplicate
             </span>
           )}
         </div>

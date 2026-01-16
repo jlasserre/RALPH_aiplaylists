@@ -35,6 +35,8 @@ export interface PlaylistSong {
   song: Song;
   spotifyTrack: SpotifyTrack | null;
   state: SongState;
+  /** Whether this song is a duplicate of another in the playlist */
+  isDuplicate?: boolean;
 }
 
 // Candidate song (from generation)
