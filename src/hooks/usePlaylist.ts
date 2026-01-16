@@ -6,6 +6,7 @@ import {
   useCandidateStore,
   getSelectedCandidates,
 } from '@/store/candidateStore';
+import { useSearchCacheStore } from '@/store/searchCacheStore';
 import type { PlaylistSong } from '@/types';
 
 interface UsePlaylistReturn {
@@ -90,11 +91,12 @@ export function usePlaylist(): UsePlaylistReturn {
   }, [getCandidates, addSongs, deselectAll]);
 
   /**
-   * Clear the playlist and candidate stores (for "New Playlist" flow)
+   * Clear the playlist, candidate, and search cache stores (for "New Playlist" flow)
    */
   const clearPlaylist = useCallback(() => {
     clearPlaylistStore();
     useCandidateStore.getState().clearCandidates();
+    useSearchCacheStore.getState().clearCache();
   }, [clearPlaylistStore]);
 
   // Calculate if there are pending changes

@@ -6,6 +6,7 @@ import { usePlaylist } from '@/hooks/usePlaylist';
 import { useCandidateStore } from '@/store/candidateStore';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useTagStore } from '@/store/tagStore';
+import { useSearchCacheStore } from '@/store/searchCacheStore';
 import { useSpotifyAuth } from '@/hooks/useSpotifyAuth';
 import { NameConflictDialog } from '@/components/features/playlist';
 import type { ConflictResolution } from '@/components/features/playlist';
@@ -63,6 +64,11 @@ export default function Home() {
   const isTagged = useTagStore((state) => state.isTagged);
   const clearTags = useTagStore((state) => state.clearTags);
   const taggedSongs = useTagStore((state) => state.taggedSongs);
+
+  // Search cache actions (for reducing Spotify API calls)
+  const getCached = useSearchCacheStore((state) => state.getCached);
+  const setCache = useSearchCacheStore((state) => state.setCache);
+  const clearCache = useSearchCacheStore((state) => state.clearCache);
 
   // User playlists state
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
@@ -459,17 +465,64 @@ export default function Home() {
           return;
         }
 
-        // Step 2: Initialize candidates with placeholders (for streaming display)
+        // Step 2: Check cache and separate cached/uncached songs
+        const cachedResults: Array<{ index: number; spotifyTrack: SpotifyTrack | null }> = [];
+        const uncachedSongs: Array<{ index: number; song: Song }> = [];
+
+        songs.forEach((song, index) => {
+          const cached = getCached(song.title, song.artist);
+          if (cached) {
+            cachedResults.push({ index, spotifyTrack: cached.spotifyTrack });
+          } else {
+            uncachedSongs.push({ index, song });
+          }
+        });
+
+        // Step 3: Initialize candidates with placeholders (for streaming display)
         initCandidates(songs);
 
-        // Step 3: Stream search results from Spotify
+        // Step 4: Immediately update cached candidates
+        cachedResults.forEach(({ index, spotifyTrack }) => {
+          updateCandidate(index, spotifyTrack);
+        });
+
+        // If all songs were cached, we're done (no API call needed)
+        if (uncachedSongs.length === 0) {
+          console.log(`All ${songs.length} songs found in cache - no API call needed`);
+          setLoadingCandidates(false);
+          abortControllerRef.current = null;
+
+          // Auto-suggest playlist name on first generation
+          if (!hasGeneratedRef.current && !playlistName) {
+            hasGeneratedRef.current = true;
+            fetch('/api/generate/suggest-name', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt, provider }),
+            })
+              .then((res) => res.ok ? res.json() : null)
+              .then((data) => {
+                if (data?.name) {
+                  setSuggestedName(data.name);
+                }
+              })
+              .catch(() => {
+                // Ignore errors - name suggestion is optional
+              });
+          }
+          return;
+        }
+
+        console.log(`Cache hit for ${cachedResults.length}/${songs.length} songs, searching ${uncachedSongs.length} uncached`);
+
+        // Step 5: Stream search results from Spotify for uncached songs only
         const searchResponse = await fetch('/api/spotify/search/stream', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            songs,
+            songs: uncachedSongs.map(({ song }) => song),
             accessToken,
           }),
           signal: abortController.signal,
@@ -527,11 +580,18 @@ export default function Home() {
 
                 if (eventType === 'result') {
                   // Update individual candidate with search result
-                  const { index, result } = data as {
+                  // Note: index from stream is relative to uncachedSongs array
+                  const { index: streamIndex, result } = data as {
                     index: number;
                     result: { song: Song; spotifyTrack: SpotifyTrack | null };
                   };
-                  updateCandidate(index, result.spotifyTrack);
+
+                  // Map stream index back to original song index
+                  const originalIndex = uncachedSongs[streamIndex]?.index ?? streamIndex;
+                  updateCandidate(originalIndex, result.spotifyTrack);
+
+                  // Cache the result for future searches
+                  setCache(result.song.title, result.song.artist, result.spotifyTrack);
                 } else if (eventType === 'complete') {
                   // All searches complete - isLoading will be set to false by updateCandidate
                   console.log(`Search complete, match rate: ${data.matchRate.toFixed(1)}%`);

@@ -2,6 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { usePlaylist } from './usePlaylist';
 import { usePlaylistStore } from '@/store/playlistStore';
 import { useCandidateStore } from '@/store/candidateStore';
+import { useSearchCacheStore } from '@/store/searchCacheStore';
 import type { Song, SpotifyTrack } from '@/types';
 
 // Helper to create mock SpotifyTrack
@@ -27,7 +28,7 @@ function createMockSong(title: string, artist: string = 'Test Artist'): Song {
 
 describe('usePlaylist', () => {
   beforeEach(() => {
-    // Reset both stores before each test
+    // Reset all stores before each test
     usePlaylistStore.setState({
       name: '',
       spotifyPlaylistId: null,
@@ -38,6 +39,10 @@ describe('usePlaylist', () => {
     useCandidateStore.setState({
       candidates: [],
       isLoading: false,
+    });
+
+    useSearchCacheStore.setState({
+      cache: new Map(),
     });
   });
 
@@ -385,6 +390,23 @@ describe('usePlaylist', () => {
 
       const candidateState = useCandidateStore.getState();
       expect(candidateState.candidates).toHaveLength(0);
+    });
+
+    it('should clear search cache store', () => {
+      // Populate the search cache
+      useSearchCacheStore.getState().setCache('Song 1', 'Artist 1', createMockSpotifyTrack('track1', 'Song 1'));
+      useSearchCacheStore.getState().setCache('Song 2', 'Artist 2', null);
+
+      expect(useSearchCacheStore.getState().getCacheSize()).toBe(2);
+
+      const { result } = renderHook(() => usePlaylist());
+
+      act(() => {
+        result.current.clearPlaylist();
+      });
+
+      // Search cache should be cleared
+      expect(useSearchCacheStore.getState().getCacheSize()).toBe(0);
     });
   });
 
