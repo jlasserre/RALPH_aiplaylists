@@ -44,6 +44,8 @@ export interface CandidateSong {
   spotifyTrack: SpotifyTrack | null;
   isSelected: boolean;
   isMatched: boolean;
+  /** Whether Spotify search is in progress for this candidate (streaming mode) */
+  isSearching?: boolean;
 }
 
 // API response types

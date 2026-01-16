@@ -44,6 +44,8 @@ export function CandidateList({
   const [isDragOver, setIsDragOver] = useState(false);
   const selectedCount = candidates.filter((c) => c.isSelected).length;
   const matchedCount = candidates.filter((c) => c.isMatched).length;
+  const searchingCount = candidates.filter((c) => c.isSearching).length;
+  const completedCount = candidates.length - searchingCount;
   const hasSelections = selectedCount > 0;
 
   /**
@@ -192,7 +194,15 @@ export function CandidateList({
 
       {/* Match rate header */}
       <div className="mb-3 text-sm text-gray-600">
-        {matchedCount} of {candidates.length} songs found on Spotify
+        {searchingCount > 0 ? (
+          <span className="flex items-center gap-2">
+            <span className="w-3 h-3 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            Searching... {completedCount} of {candidates.length} checked
+            {matchedCount > 0 && ` (${matchedCount} found)`}
+          </span>
+        ) : (
+          `${matchedCount} of ${candidates.length} songs found on Spotify`
+        )}
       </div>
 
       {/* Candidate list */}
@@ -211,27 +221,37 @@ export function CandidateList({
               e.dataTransfer.effectAllowed = 'copy';
             }}
             className={`p-3 rounded-lg border-2 transition-colors ${
-              !candidate.isMatched
-                ? 'bg-gray-50 border-gray-100 opacity-60'
-                : candidate.spotifyTrack && isTagged?.(candidate.spotifyTrack.id)
-                  ? 'bg-amber-50 border-amber-300 hover:border-amber-400 cursor-grab active:cursor-grabbing'
-                  : 'bg-white border-gray-200 hover:border-gray-300 cursor-grab active:cursor-grabbing'
+              candidate.isSearching
+                ? 'bg-gray-50 border-gray-200 animate-pulse'
+                : !candidate.isMatched
+                  ? 'bg-gray-50 border-gray-100 opacity-60'
+                  : candidate.spotifyTrack && isTagged?.(candidate.spotifyTrack.id)
+                    ? 'bg-amber-50 border-amber-300 hover:border-amber-400 cursor-grab active:cursor-grabbing'
+                    : 'bg-white border-gray-200 hover:border-gray-300 cursor-grab active:cursor-grabbing'
             }`}
           >
             <div className="flex items-start gap-3">
-              <Checkbox
-                label=""
-                checked={candidate.isSelected}
-                disabled={!candidate.isMatched}
-                onChange={() => onToggleSelection?.(candidate.id)}
-                aria-label={`Select ${candidate.song.title} by ${candidate.song.artist}`}
-              />
+              {candidate.isSearching ? (
+                <div className="w-4 h-4 mt-0.5 border-2 border-green-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              ) : (
+                <Checkbox
+                  label=""
+                  checked={candidate.isSelected}
+                  disabled={!candidate.isMatched}
+                  onChange={() => onToggleSelection?.(candidate.id)}
+                  aria-label={`Select ${candidate.song.title} by ${candidate.song.artist}`}
+                />
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900 truncate">
                     {candidate.song.title}
                   </span>
-                  {!candidate.isMatched && (
+                  {candidate.isSearching ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                      Searching...
+                    </span>
+                  ) : !candidate.isMatched && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
                       Not found
                     </span>

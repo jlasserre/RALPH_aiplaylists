@@ -749,3 +749,28 @@
   - When implementing component loading states, skeleton loaders should be included from the start
   - The animate-pulse class in Tailwind CSS provides a subtle, professional loading effect
 ---
+
+## 2026-01-16 - US-049
+- What was implemented: Streaming song results display using Server-Sent Events (SSE)
+- Files changed:
+  - src/app/api/spotify/search/stream/route.ts - New SSE endpoint for streaming Spotify search results
+  - src/store/candidateStore.ts - Added initCandidates and updateCandidate actions for streaming support
+  - src/store/candidateStore.test.ts - Added 8 tests for new streaming actions
+  - src/types/index.ts - Added optional isSearching field to CandidateSong interface
+  - src/components/features/playlist/CandidateList.tsx - Added individual loading indicators for searching songs
+  - src/app/page.tsx - Updated handleSuggestSongs to use streaming endpoint
+- **Implementation details:**
+  - SSE endpoint sends 'result' events as each Spotify search completes
+  - initCandidates(songs) creates placeholder candidates with isSearching=true
+  - updateCandidate(index, spotifyTrack) updates individual candidate when search completes
+  - CandidateList shows spinning indicator instead of checkbox for searching songs
+  - Match rate header shows "Searching... X of Y checked (N found)" during streaming
+  - Songs with isSearching=true have "Searching..." badge and animate-pulse effect
+  - Users can select completed songs while others are still searching
+- **Learnings for future iterations:**
+  - SSE (Server-Sent Events) is ideal for streaming multiple results back to client
+  - Use `event: type\ndata: json\n\n` format for SSE messages
+  - Track individual search completion with isSearching flag per candidate
+  - Store's isLoading automatically becomes false when all candidates finish searching
+  - Concurrency control (5 parallel requests) prevents overwhelming Spotify API
+---

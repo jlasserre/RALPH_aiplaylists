@@ -13,6 +13,13 @@ interface CandidateActions {
   setCandidates: (
     songs: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }>
   ) => void;
+  /** Initialize candidates with placeholder entries (for streaming) */
+  initCandidates: (songs: Song[]) => void;
+  /** Update a candidate with Spotify search result (for streaming) */
+  updateCandidate: (
+    index: number,
+    spotifyTrack: SpotifyTrack | null
+  ) => void;
   /** Toggle selection state for a candidate (only matched songs can be selected) */
   toggleSelection: (candidateId: string) => void;
   /** Select all matched candidates */
@@ -59,6 +66,42 @@ export const useCandidateStore = create<CandidateStore>((set, get) => ({
         isSelected: false,
       })),
       isLoading: false,
+    }),
+
+  initCandidates: (songs) =>
+    set({
+      candidates: songs.map((song) => ({
+        id: generateCandidateId(),
+        song,
+        spotifyTrack: null,
+        isMatched: false, // Will be updated when search result arrives
+        isSelected: false,
+        isSearching: true, // Flag to indicate search in progress
+      })),
+      isLoading: true, // Keep overall loading state true
+    }),
+
+  updateCandidate: (index, spotifyTrack) =>
+    set((state) => {
+      if (index < 0 || index >= state.candidates.length) {
+        return state; // Invalid index, no-op
+      }
+
+      const newCandidates = [...state.candidates];
+      newCandidates[index] = {
+        ...newCandidates[index],
+        spotifyTrack,
+        isMatched: spotifyTrack !== null,
+        isSearching: false,
+      };
+
+      // Check if all candidates have finished searching
+      const allDone = newCandidates.every((c) => !c.isSearching);
+
+      return {
+        candidates: newCandidates,
+        isLoading: !allDone,
+      };
     }),
 
   toggleSelection: (candidateId: string) =>

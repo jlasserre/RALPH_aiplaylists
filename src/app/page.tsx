@@ -43,6 +43,8 @@ export default function Home() {
   const toggleSelection = useCandidateStore((state) => state.toggleSelection);
   const clearCandidates = useCandidateStore((state) => state.clearCandidates);
   const setCandidates = useCandidateStore((state) => state.setCandidates);
+  const initCandidates = useCandidateStore((state) => state.initCandidates);
+  const updateCandidate = useCandidateStore((state) => state.updateCandidate);
   const setLoadingCandidates = useCandidateStore((state) => state.setLoading);
   const insertCandidatesAfter = useCandidateStore((state) => state.insertCandidatesAfter);
 
@@ -322,8 +324,8 @@ export default function Home() {
   /**
    * Handle song generation flow:
    * 1. Call /api/generate to get song suggestions from LLM
-   * 2. Call /api/spotify/search to find tracks on Spotify
-   * 3. Display candidates in the middle panel
+   * 2. Call /api/spotify/search/stream to find tracks on Spotify (streaming)
+   * 3. Display candidates incrementally as results arrive
    */
   const handleSuggestSongs = useCallback(
     async (prompt: string, provider: LLMProvider) => {
@@ -361,8 +363,11 @@ export default function Home() {
           return;
         }
 
-        // Step 2: Search for songs on Spotify
-        const searchResponse = await fetch('/api/spotify/search', {
+        // Step 2: Initialize candidates with placeholders (for streaming display)
+        initCandidates(songs);
+
+        // Step 3: Stream search results from Spotify
+        const searchResponse = await fetch('/api/spotify/search/stream', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -380,18 +385,60 @@ export default function Home() {
           return;
         }
 
-        const searchData = await searchResponse.json();
-        const results: Array<{ song: Song; spotifyTrack: SpotifyTrack | null }> =
-          searchData.results || [];
+        // Read SSE stream
+        const reader = searchResponse.body?.getReader();
+        if (!reader) {
+          console.error('No response body for streaming');
+          setLoadingCandidates(false);
+          return;
+        }
 
-        // Step 3: Set candidates in the store
-        setCandidates(results);
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete events in buffer
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          let eventType = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7).trim();
+            } else if (line.startsWith('data: ') && eventType) {
+              const data = JSON.parse(line.slice(6));
+
+              if (eventType === 'result') {
+                // Update individual candidate with search result
+                const { index, result } = data as {
+                  index: number;
+                  result: { song: Song; spotifyTrack: SpotifyTrack | null };
+                };
+                updateCandidate(index, result.spotifyTrack);
+              } else if (eventType === 'complete') {
+                // All searches complete - isLoading will be set to false by updateCandidate
+                console.log(`Search complete, match rate: ${data.matchRate.toFixed(1)}%`);
+              } else if (eventType === 'error') {
+                console.error('Stream error:', data.message);
+                setLoadingCandidates(false);
+                return;
+              }
+
+              eventType = '';
+            }
+          }
+        }
       } catch (error) {
         console.error('Error during song generation:', error);
         setLoadingCandidates(false);
       }
     },
-    [accessToken, setLoadingCandidates, setCandidates]
+    [accessToken, setLoadingCandidates, setCandidates, initCandidates, updateCandidate]
   );
 
   /**
