@@ -820,3 +820,22 @@
   - Spotify playlist URLs follow format: https://open.spotify.com/playlist/{playlistId}
 ---
 
+
+## 2026-01-16 - US-059
+- What was implemented: CSRF protection for write endpoints using double-submit cookie pattern
+- Files changed:
+  - src/lib/csrf.ts - New CSRF token generation and validation utilities (generateCSRFToken, setCSRFCookies, clearCSRFCookies, validateCSRFToken)
+  - src/lib/csrf-client.ts - Client-side CSRF utilities (getCSRFToken, createHeadersWithCSRF, fetchWithCSRF)
+  - src/lib/csrf.test.ts - 15 tests for CSRF utilities
+  - src/app/api/auth/spotify/callback/route.ts - Generate and set CSRF token on successful OAuth
+  - src/app/api/auth/refresh/route.ts - Ensure CSRF token exists on token refresh (backward compatibility)
+  - src/app/api/spotify/playlist/route.ts - Validate CSRF token on POST and PUT handlers, return 403 on invalid token
+  - src/app/page.tsx - Use createHeadersWithCSRF for all /api/spotify/playlist requests
+- **Learnings for future iterations:**
+  - Double-submit cookie pattern: httpOnly cookie for server validation, non-httpOnly cookie for client access
+  - Use timing-safe string comparison (XOR loop) to prevent timing attacks on token validation
+  - CSRF token header name convention: x-csrf-token
+  - Generate CSRF token on both OAuth callback AND token refresh for backward compatibility with existing sessions
+  - Frontend utility createHeadersWithCSRF merges CSRF token with other headers for easy integration
+  - process.env.NODE_ENV is read-only in TypeScript strict mode - test secure flag based on current env value instead of modifying
+---
