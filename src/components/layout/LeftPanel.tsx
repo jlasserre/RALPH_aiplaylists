@@ -23,6 +23,10 @@ interface LeftPanelProps {
   userPlaylists?: UserPlaylist[];
   /** Whether playlists are being loaded */
   isLoadingPlaylists?: boolean;
+  /** Number of songs currently tagged */
+  taggedCount?: number;
+  /** Callback when "Generate Prompt from Tags" is clicked */
+  onGenerateFromTags?: () => string | undefined;
 }
 
 const PROMPT_MIN_LENGTH = 10;
@@ -45,6 +49,8 @@ export function LeftPanel({
   isGenerating = false,
   userPlaylists = [],
   isLoadingPlaylists = false,
+  taggedCount = 0,
+  onGenerateFromTags,
 }: LeftPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [llmProvider, setLLMProvider] = useState<LLMProvider>('claude');
@@ -60,6 +66,17 @@ export function LeftPanel({
   const handleSuggestSongs = () => {
     if (prompt.length >= PROMPT_MIN_LENGTH) {
       onSuggestSongs?.(prompt, llmProvider);
+    }
+  };
+
+  /**
+   * Handle Generate Prompt from Tags click
+   * Calls parent handler and sets the returned prompt in the textarea
+   */
+  const handleGenerateFromTags = () => {
+    const generatedPrompt = onGenerateFromTags?.();
+    if (generatedPrompt) {
+      setPrompt(generatedPrompt);
     }
   };
 
@@ -167,6 +184,31 @@ export function LeftPanel({
         onChange={(e) => onPlaylistNameChange?.(e.target.value)}
         maxLength={100}
       />
+
+      {/* Generate from Tags Button - shown when songs are tagged */}
+      {taggedCount > 0 && (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="w-full"
+          onClick={handleGenerateFromTags}
+        >
+          <svg
+            className="w-4 h-4 mr-2 inline-block"
+            fill="currentColor"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+            />
+          </svg>
+          Generate Prompt from {taggedCount} Tagged {taggedCount === 1 ? 'Song' : 'Songs'}
+        </Button>
+      )}
 
       {/* Prompt Textarea */}
       <TextArea

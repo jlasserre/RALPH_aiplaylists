@@ -49,6 +49,9 @@ export default function Home() {
   // Tag state and actions
   const toggleTag = useTagStore((state) => state.toggleTag);
   const isTagged = useTagStore((state) => state.isTagged);
+  const clearTags = useTagStore((state) => state.clearTags);
+  const taggedSongs = useTagStore((state) => state.taggedSongs);
+  const taggedCount = taggedSongs.length;
 
   // User playlists state
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
@@ -316,6 +319,29 @@ export default function Home() {
     },
     [handleMoreLikeThis]
   );
+
+  /**
+   * Generate a prompt from tagged songs.
+   * Format: "Songs similar to [Song A] by [Artist A], [Song B] by [Artist B], ..."
+   * Returns the generated prompt and clears the tags.
+   */
+  const handleGenerateFromTags = useCallback(() => {
+    if (taggedSongs.length === 0) {
+      return undefined;
+    }
+
+    // Build the prompt from tagged songs
+    const songDescriptions = taggedSongs.map(
+      (tagged) => `"${tagged.song.title}" by ${tagged.song.artist}`
+    );
+
+    const prompt = `Songs similar to ${songDescriptions.join(', ')}`;
+
+    // Clear the tags after generating
+    clearTags();
+
+    return prompt;
+  }, [taggedSongs, clearTags]);
 
   /**
    * Handle song generation flow:
@@ -884,6 +910,8 @@ export default function Home() {
             isGenerating={isLoadingCandidates}
             userPlaylists={userPlaylists}
             isLoadingPlaylists={isLoadingPlaylists}
+            taggedCount={taggedCount}
+            onGenerateFromTags={handleGenerateFromTags}
           />
         }
         middlePanel={
