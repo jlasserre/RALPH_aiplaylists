@@ -785,8 +785,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 46,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added 'Generate Prompt from X Tagged Songs' button to LeftPanel that appears when taggedCount > 0. handleGenerateFromTags in page.tsx builds prompt 'Songs similar to [Song A] by [Artist], ...' format. Tags are cleared after generation. User can edit prompt before clicking 'Suggest songs'."
     },
     {
       "id": "US-047",

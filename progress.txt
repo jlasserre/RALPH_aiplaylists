@@ -705,3 +705,16 @@
   - Tag icon (label/tag shape) with fill when tagged, outline when not, is intuitive UX
   - 18 tests for tagStore cover: toggle on/off, multiple tags, isTagged check, clearTags, and selectors
 ---
+
+## 2026-01-16 - US-046
+- What was implemented: Generate Prompt From Tagged feature
+- Files changed:
+  - src/components/layout/LeftPanel.tsx - Added taggedCount and onGenerateFromTags props, "Generate Prompt from X Tagged Songs" button with tag icon
+  - src/app/page.tsx - Added handleGenerateFromTags callback, taggedCount from store, clearTags action, passed props to LeftPanel
+- **Learnings for future iterations:**
+  - Return value from callback pattern (onGenerateFromTags returns string) allows parent to compute value and child to consume it
+  - Button with dynamic count ("from 3 Tagged Songs") provides good UX feedback
+  - Format "Songs similar to [Song] by [Artist], ..." works well for LLM prompts
+  - clearTags() after generation ensures clean slate for next tagging session
+  - User can edit the generated prompt before clicking "Suggest songs" (editable textarea)
+---
