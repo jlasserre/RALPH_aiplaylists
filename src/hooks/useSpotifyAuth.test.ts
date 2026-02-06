@@ -33,6 +33,11 @@ describe('useSpotifyAuth', () => {
       expect(result.current.accessToken).toBeNull();
       expect(typeof result.current.login).toBe('function');
       expect(typeof result.current.logout).toBe('function');
+
+      // Wait for the async refresh effect to settle
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
     });
   });
 
@@ -114,10 +119,12 @@ describe('useSpotifyAuth', () => {
         hasAttemptedRefresh: false,
       });
 
-      renderHook(() => useSpotifyAuth());
+      const { result } = renderHook(() => useSpotifyAuth());
 
-      // Wait a bit to ensure effect has a chance to run
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for effects to settle, then verify no fetch was made
+      await waitFor(() => {
+        expect(result.current.isAuthenticated).toBe(true);
+      });
 
       expect(mockFetch).not.toHaveBeenCalled();
     });
