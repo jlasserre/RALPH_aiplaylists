@@ -43,3 +43,16 @@ next-env.d.ts
 
 # claude code
 .claude/settings.local.json
+
+# skills runtime artifacts
+skills/*.log
+skills/*.txt
+skills/*.png
+skills/dev-browser/node_modules/
+skills/dev-browser/profiles/
+skills/dev-browser/tmp/
+skills/dev-browser/bun.lock
+skills/dev-browser/package-lock.json
+
+# personal notes
+changes I want.md
